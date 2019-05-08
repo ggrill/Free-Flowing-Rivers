@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>4 Python modules - Free-flowing Rivers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="icon" href="//ggrill.github.io/Free-Flowing-Rivers/favicon.png">
+
+  
+  
+  <link rel="stylesheet" href="/Free-Flowing-Rivers/css/style.min.020d604e977275cf093999068602ba80e6eb2f78df409ccca5a76f02778bea56.css">
+  
+
+  
+
+</head>
+
+<body class='page page-default-single'>
+  <div id="main-menu-mobile" class="main-menu-mobile">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/Free-Flowing-Rivers/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/Free-Flowing-Rivers/docs/">
+        <span>docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+  <div class="wrapper">
+    <div class='header'>
+  <div class="container">
+    <div class="logo">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/"><img alt="Logo" src="/Free-Flowing-Rivers/images/logo.svg" /></a>
+    </div>
+    <div class="logo-mobile">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/"><img alt="Logo" src="/Free-Flowing-Rivers/images/logo-mobile.svg" /></a>
+    </div>
+    <div id="main-menu" class="main-menu">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/Free-Flowing-Rivers/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/Free-Flowing-Rivers/docs/">
+        <span>docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+    <button id="toggle-main-menu-mobile" class="hamburger hamburger--slider" type="button">
+  <span class="hamburger-box">
+    <span class="hamburger-inner"></span>
+  </span>
+</button>
+  </div>
+</div>
+
+
+    
+    
+    
+    
+    
+    
+
+    
+    <div class="container pt-2 pt-md-6 pb-3 pb-md-6">
+      <div class="row">
+        <div class="col-12 col-md-3 mb-3">
+          <div class="sidebar">
+            
+<div class="docs-menu">
+  <h4>Docs</h4>
+  <ul>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/1_introduction/">1 Introduction</a>
+    </li>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/2_requirements/">2 Requirements</a>
+    </li>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/3_input_data/">3 Input data</a>
+    </li>
+    
+    <li class="active ">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/4_python_modules/">4 Python modules</a>
+    </li>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/5_run/">5 Results</a>
+    </li>
+    
+  </ul>
+</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-md-9">
+          
+<h1 class="title">4 Python modules</h1>
+<div class="content">
+  
+
+<p>The structure of this repository is composed of a starting script, and a set of 5 modules, each of which contain a set of python files. The following elements are described here:</p>
+
+<ol>
+<li><strong>the python file <code>fra_start.py</code>:</strong> A starting script that triggers the assessment</li>
+<li><strong>the module <code>CONFIG</code>:</strong> An Excel file that is used to provide paths and parameters for the assessment</li>
+<li><strong>the module <code>SCRIPTS</code>:</strong> A module with scripts for automating the processing of scenarios</li>
+<li><strong>the module <code>INDICES</code>:</strong> A module with algorithms to calculate the indices (DOF, DOR, SED, DOM, STA)</li>
+<li><strong>the module <code>STATS</code>:</strong> A module to calculate statistics, and to conduct the benchmarking</li>
+<li><strong>the module <code>TOOLS</code>:</strong> A helper module with geoprocessing tools</li>
+</ol>
+
+<h4 id="4-1-python-file-fra-start-py">4.1 Python file <code>fra_start.py</code></h4>
+
+<p>The start of the assessment is triggered by running the python file <code>fra_start.py</code> from a command line editor or through a programming environment, such as Pycharm. The script reads the configuration file (<code>config.xlsx</code>), establishes which components of the assessment are to be executed, and creates an output directory structure for the results.</p>
+
+<h4 id="4-2-module-config">4.2 Module ‘config’</h4>
+
+<p>The configuration file <code>config.xlsx</code>, located in the folder <code>config</code>, provides the main parameters for the analysis, and serves two main purposes:</p>
+
+<ol>
+<li>It provides parameter settings for the model run, for example settings to control the Degree of Fragmentation (<code>DOF</code>) analysis. It furthermore provides input data and output folder paths (see sheet <code>SET_GLO</code> in <code>config.xlsx</code>).</li>
+<li>It provides the spreadsheet where existing scenarios are defined and weights to individual pressure indicators are allocated (see sheet <code>SCE_100</code> in <code>config.xlsx</code>).</li>
+</ol>
+
+<h5 id="4-2-1-settings">4.2.1 Settings</h5>
+
+<p>The sheet <code>SET_GLO</code> in <code>config.xlsx</code> provides an example settings file, with a number of relevant parameter settings. These include path settings, general settings, and settings related to DOF, DOR, and SED calculations. The table contains the four columns <code>Category</code>, <code>Key</code>, <code>Value</code>, and <code>Description</code>. See the spreadsheet for more information on the keys and their function.</p>
+
+<h5 id="4-2-2-scenarios">4.2.2 Scenarios</h5>
+
+<p>The individual scenarios are defined in the worksheet <code>SCE_100</code> in <code>config.xlsx</code>. Under this header row, each additional row corresponds to a distinct scenario. One hundred predefined scenarios already exist in the template spreadsheet. Another 22 scenarios exist for conducting sensitivity analysis. The following columns are present and explained below:</p>
+
+<table>
+<thead>
+<tr>
+<th>Field name</th>
+<th>Descriptions</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>Scenario_name</td>
+<td>Provides the name of the Scenario. Please keep this name very simple (preferably something like ‘CSI01’; CSI02 etc.), and under 10 characters, do not use blanks or special characters, and do not start the name with a number.</td>
+</tr>
+
+<tr>
+<td>Indicator_1 to Indicator_6</td>
+<td>These refer to pressure indicators to be used in the scenario. The name given here must reflect the field names in the input <code>streams</code> feature class in the geodatabase.</td>
+</tr>
+
+<tr>
+<td>Weight_1 to Weight_6</td>
+<td>These are the weights assigned to each pressure indicator. The sum of the weights should equal to 100%, otherwise there may be a distortion.</td>
+</tr>
+
+<tr>
+<td>CSI_threshold</td>
+<td>The field defines the CSI threshold to use for determining the FFR status (0-100%).</td>
+</tr>
+
+<tr>
+<td>Fld_damp</td>
+<td>This parameter determines the strength of the floodplain weighting (0-100%).</td>
+</tr>
+
+<tr>
+<td>filter_thresh</td>
+<td>Provides a parameter for filtering extreme outliers (% of total flow of river affected)</td>
+</tr>
+
+<tr>
+<td>to_process</td>
+<td>Determines if the scenario is to be included in the model run (0 or 1)</td>
+</tr>
+
+<tr>
+<td>to_export</td>
+<td>Determines if a result table and feature class will be produced (0 or 1)</td>
+</tr>
+</tbody>
+</table>
+
+<hr />
+
+<h4 id="4-3-module-scripts">4.3 Module “scripts”</h4>
+
+<p>The python files in this module are triggered by the start script <code>fra_start.py</code> and each execute a series of functions and algorithms to calculate the DOF, DOR, and SED, respectively. The python scripts rely on functions defined in the modules &ldquo;indices&rdquo; and &ldquo;stats&rdquo;.</p>
+
+<h4 id="4-4-module-indices">4.4 Module “indices”</h4>
+
+<p>The python files here provide source code related to calculating the main indices, i.e. DOF, DOR, and SED</p>
+
+<h4 id="4-5-module-stats">4.5 Module “stats”</h4>
+
+<p>This module contains functions to perform benchmarking, sensitivity analysis, and to create statistics.</p>
+
+</div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="sub-footer">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <div class="sub-footer-inner">
+          <ul>
+            <li class="zerostatic"><a href="https://github.com/ggrill/Free-Flowing-Rivers">github.com/ggrill/Free-Flowing-Rivers</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+  
+  
+
+  
+  <script type="text/javascript" src="/Free-Flowing-Rivers/js/scripts.min.bf1e1f7ae8e03db5f012356e825843facdff51c0a559cb0d27fe2bbe1db405c2.js"></script>
+  
+
+  
+  
+  
+    
+  
+
+
+</body>
+
+</html>

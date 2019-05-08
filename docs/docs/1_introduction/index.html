@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>1 Introduction - Free-flowing Rivers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="icon" href="//ggrill.github.io/Free-Flowing-Rivers/favicon.png">
+
+  
+  
+  <link rel="stylesheet" href="/Free-Flowing-Rivers/css/style.min.020d604e977275cf093999068602ba80e6eb2f78df409ccca5a76f02778bea56.css">
+  
+
+  
+
+</head>
+
+<body class='page page-default-single'>
+  <div id="main-menu-mobile" class="main-menu-mobile">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/Free-Flowing-Rivers/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/Free-Flowing-Rivers/docs/">
+        <span>docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+  <div class="wrapper">
+    <div class='header'>
+  <div class="container">
+    <div class="logo">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/"><img alt="Logo" src="/Free-Flowing-Rivers/images/logo.svg" /></a>
+    </div>
+    <div class="logo-mobile">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/"><img alt="Logo" src="/Free-Flowing-Rivers/images/logo-mobile.svg" /></a>
+    </div>
+    <div id="main-menu" class="main-menu">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/Free-Flowing-Rivers/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/Free-Flowing-Rivers/docs/">
+        <span>docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+    <button id="toggle-main-menu-mobile" class="hamburger hamburger--slider" type="button">
+  <span class="hamburger-box">
+    <span class="hamburger-inner"></span>
+  </span>
+</button>
+  </div>
+</div>
+
+
+    
+    
+    
+    
+    
+    
+
+    
+    <div class="container pt-2 pt-md-6 pb-3 pb-md-6">
+      <div class="row">
+        <div class="col-12 col-md-3 mb-3">
+          <div class="sidebar">
+            
+<div class="docs-menu">
+  <h4>Docs</h4>
+  <ul>
+    
+    <li class="active ">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/1_introduction/">1 Introduction</a>
+    </li>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/2_requirements/">2 Requirements</a>
+    </li>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/3_input_data/">3 Input data</a>
+    </li>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/4_python_modules/">4 Python modules</a>
+    </li>
+    
+    <li class="">
+      <a href="//ggrill.github.io/Free-Flowing-Rivers/docs/5_run/">5 Results</a>
+    </li>
+    
+  </ul>
+</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-md-9">
+          
+<h1 class="title">1 Introduction</h1>
+<div class="content">
+  
+
+<p><img align="right" src="images/river_concept.png" width="450"/></p>
+
+<h3 id="1-1-background">1.1 Background</h3>
+
+<p>This repository contains source code related to the study: <em>Mapping the world&rsquo;s free-flowing rivers</em>. The scripts and modules described here form part of a &ldquo;free-flowing rivers analysis: or <strong>&ldquo;FRA&rdquo;</strong></p>
+
+<p><strong>Free-flowing rivers assessment (FRA).</strong> A FRA is an assessment to determine the connectivity status of rivers by taking into consideration both natural connectivity as well as fragmentation from infrastructure, such as dams, roads, urban areas, water use.</p>
+
+<p><strong>Connectivity Status Index (CSI).</strong> The methodology uses global datasets of hydrography and pressure indicators to create an integrated connectivity status index (CSI).</p>
+
+<p><strong>Connectivity dimensions.</strong> Four dimensions are considered to determine the CSI of river reaches: (1) longitudinal (connectivity between up- and downstream), (2) lateral (connectivity to floodplain and riparian areas), (3) vertical (connectivity to groundwater and atmosphere) and (4) temporal (connectivity based on seasonality of flows).</p>
+
+<p><strong>Hydrographic framework.</strong> River reaches are the smallest element in the river network and unit for the calculation of the CSI. Rivers are linear feature that consists of multiple river reaches. Tributaries form new rivers. Free-flowing status is determined at the scale of the entire river.</p>
+
+<p><strong>FFR status.</strong> Free-flowing river status is determined on the basis of CSI. Only rivers with high levels of connectivity (CSI ≥ 95%) throughout their entire length are considered FFRs.</p>
+
+<p><strong>Pressure indicators.</strong> The assessment relies on 6 pressure indicators:</p>
+
+<ol>
+<li>Degree of Fragmentation (DOF)</li>
+<li>Degree of Regulation (DOR)</li>
+<li>Sediment Trapping Index (SED)</li>
+<li>Water consumption (USE)</li>
+<li>Road construction (RDD)</li>
+<li>Urban development (URB)</li>
+</ol>
+
+<p><strong>Connectivity Status Index (CSI)</strong>. The CSI is the weighted average of the six pressure indicators described above. The CSI is calculated at the river reach scale and is used to determine the free-flowing river status.</p>
+
+<p><strong>Dominant Pressure Factor (DOM).</strong>. This index indicated which of the six pressure indicators contributed most to the weighted CSI value.</p>
+
+<p><strong>Free-flowing river status (STA).</strong>. The status of a river can be classified as either &ldquo;free-flowing&rdquo;, &ldquo;good connectivity status&rdquo; (partial river), or &ldquo;impacted&rdquo;.</p>
+
+<h3 id="1-2-objectives-and-outcomes-of-this-repository">1.2 Objectives and outcomes of this repository</h3>
+
+<p><strong>The source code described here aims to</strong></p>
+
+<ul>
+<li>calculate or update pressure indicators (such as DOF, DOR, SED) that form the basis for calculating the connectivity status index (CSI);</li>
+<li>calculate the connectivity status index (CSI) using multiple weighting scenarios, and conduct benchmarking and sensitivity analysis</li>
+<li>calculate the Dominant Pressure Factor (DOM), given the cumulative pressures from the six pressure factors</li>
+<li>classify rivers according to their free-flowing status (STA)</li>
+<li>produce statistics and geodata results</li>
+</ul>
+
+</div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="sub-footer">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <div class="sub-footer-inner">
+          <ul>
+            <li class="zerostatic"><a href="https://github.com/ggrill/Free-Flowing-Rivers">github.com/ggrill/Free-Flowing-Rivers</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+  
+  
+
+  
+  <script type="text/javascript" src="/Free-Flowing-Rivers/js/scripts.min.bf1e1f7ae8e03db5f012356e825843facdff51c0a559cb0d27fe2bbe1db405c2.js"></script>
+  
+
+  
+  
+  
+    
+  
+
+
+</body>
+
+</html>

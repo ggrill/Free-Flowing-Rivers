@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Overview on Free-flowing Rivers</title>
+    <link>//ggrill.github.io/Free-Flowing-Rivers/docs/</link>
+    <description>Recent content in Overview on Free-flowing Rivers</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Wed, 28 Nov 2018 15:14:39 +1000</lastBuildDate>
+    
+	<atom:link href="//ggrill.github.io/Free-Flowing-Rivers/docs/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>1 Introduction</title>
+      <link>//ggrill.github.io/Free-Flowing-Rivers/docs/1_introduction/</link>
+      <pubDate>Mon, 11 Feb 2019 09:27:37 +0000</pubDate>
+      
+      <guid>//ggrill.github.io/Free-Flowing-Rivers/docs/1_introduction/</guid>
+      <description>1.1 Background This repository contains source code related to the study: Mapping the world&amp;rsquo;s free-flowing rivers. The scripts and modules described here form part of a &amp;ldquo;free-flowing rivers analysis: or &amp;ldquo;FRA&amp;rdquo;
+Free-flowing rivers assessment (FRA). A FRA is an assessment to determine the connectivity status of rivers by taking into consideration both natural connectivity as well as fragmentation from infrastructure, such as dams, roads, urban areas, water use.
+Connectivity Status Index (CSI).</description>
+    </item>
+    
+    <item>
+      <title>2 Requirements</title>
+      <link>//ggrill.github.io/Free-Flowing-Rivers/docs/2_requirements/</link>
+      <pubDate>Mon, 11 Feb 2019 19:27:37 +1000</pubDate>
+      
+      <guid>//ggrill.github.io/Free-Flowing-Rivers/docs/2_requirements/</guid>
+      <description>The python scripts in this repository require third-party modules to run such as:
+ the source code requires that the software ArcGIS 10.5.1 or newer is installed. ArcGIS provides essential python interfaces, such as arcpy, as well as other frameworks such as numpy and pandas, upon which the code relies on heavily. The python interpreter must be set to the one provided by the ArcGIS installation. The scripts use an EXCEL workbook as input, and as such, require either Microsoft Excel, or LibreOffice the ArcGIS 64-bit geoprocessing module may be beneficial depending on the data volume.</description>
+    </item>
+    
+    <item>
+      <title>3 Input data</title>
+      <link>//ggrill.github.io/Free-Flowing-Rivers/docs/3_input_data/</link>
+      <pubDate>Mon, 11 Feb 2019 19:27:37 +1000</pubDate>
+      
+      <guid>//ggrill.github.io/Free-Flowing-Rivers/docs/3_input_data/</guid>
+      <description>A typical Free-flowing Rivers assessment must have four essential files:
+3.1 Stream network The feature class streams, which contains the river network, with the essential attributes to conduct the FRA. The stream network provides information for all 6 pressure indicators, the presence of waterfalls, as well as floodplain densities. For a description of the stream network and its attributes please see the technical documentation in the figshare repository at https://doi.</description>
+    </item>
+    
+    <item>
+      <title>4 Python modules</title>
+      <link>//ggrill.github.io/Free-Flowing-Rivers/docs/4_python_modules/</link>
+      <pubDate>Mon, 11 Feb 2019 19:27:37 +1000</pubDate>
+      
+      <guid>//ggrill.github.io/Free-Flowing-Rivers/docs/4_python_modules/</guid>
+      <description>The structure of this repository is composed of a starting script, and a set of 5 modules, each of which contain a set of python files. The following elements are described here:
+ the python file fra_start.py: A starting script that triggers the assessment the module CONFIG: An Excel file that is used to provide paths and parameters for the assessment the module SCRIPTS: A module with scripts for automating the processing of scenarios the module INDICES: A module with algorithms to calculate the indices (DOF, DOR, SED, DOM, STA) the module STATS: A module to calculate statistics, and to conduct the benchmarking the module TOOLS: A helper module with geoprocessing tools  4.</description>
+    </item>
+    
+    <item>
+      <title>5 Results</title>
+      <link>//ggrill.github.io/Free-Flowing-Rivers/docs/5_run/</link>
+      <pubDate>Mon, 11 Feb 2019 19:30:08 +1000</pubDate>
+      
+      <guid>//ggrill.github.io/Free-Flowing-Rivers/docs/5_run/</guid>
+      <description>5.1 Launching the assessment The main script is the starting point for every model run. The main script reads the parameter and scenario settings from the excel file, prepares output folders and files; executes the defined processing steps. Run the starting script fra_start.py from the commandline or through the PyCharm environment.
+5.2 Results The model generates two types of results:
+ Tabular data in the form of an Excel workbook with several worksheets.</description>
+    </item>
+    
+  </channel>
+</rss>

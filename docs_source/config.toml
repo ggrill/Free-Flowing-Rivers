@@ -1,0 +1,41 @@
+baseURL = "//ggrill.github.io/Free-Flowing-Rivers/"
+languageCode = "en-us"
+title = "Free-flowing Rivers"
+themesDir = "themes"
+theme = "hugo-whisper-theme"
+publishDir = "../docs"
+pygmentsCodeFences = true
+pygmentsCodefencesGuessSyntax = true
+pygmentsUseClasses = true
+
+[[menu.main]]
+    name = "Home"
+    url = "/"
+    weight = 1
+
+[[menu.main]]
+    name = "docs"
+    url = "/docs/"
+    weight = 2
+
+[params]
+  google_analytics_id=""
+  homepage_button_link = '/docs'
+  homepage_button_text = 'Read The Docs'
+  homepage_intro = 'Free-Flowing-Rivers'
+  homepage_image = '/images/ffr.png'
+
+  [params.homepage_meta_tags]
+    meta_description = "Free-flowing rivers"
+    meta_og_title = "Free-flowing Rivers"
+    meta_og_type = "website"
+    meta_og_url = ""
+    meta_og_image = ""
+    meta_og_description = ""
+    meta_twitter_card = "summary"
+    meta_twitter_site = "@guenthergrill"
+    meta_twitter_creator = "@guenthergrill"
+
+  [params.logo]
+      mobile = "/images/logo-mobile.svg"
+      standard  = "/images/logo.svg"
