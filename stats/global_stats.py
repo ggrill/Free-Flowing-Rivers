@@ -1,10 +1,11 @@
 import pandas as pd
+import geopandas as gpd
 
 from stats.benchmarking import fd
 from tools import helper as tools
 
 
-def post_stats_global_single(stream_array, csi_name, csi_threshold):
+def post_stats_global_single(stream_array:gpd.GeoDataFrame, csi_name, csi_threshold):
     """
     Calculate a series of global statistics and write into Excel sheet as row
 
@@ -14,18 +15,19 @@ def post_stats_global_single(stream_array, csi_name, csi_threshold):
     :return:
     """
     global threshold
-    panda0 = pd.DataFrame(stream_array)
+    panda0 = stream_array.copy() #pd.DataFrame(stream_array)
     panda_df = panda0[panda0[fd.INC] == 1]
 
-    glo = []
-    glo.append(["sce_name", "count_reaches", "count_reaches_affected",
-                "perc_reaches_affected", "mean_csi", "count_nff", "perc_nff"])
-    headers = glo.pop(0)
+    # This do anything
+    # glo = []
+    # glo.append(["sce_name", "count_reaches", "count_reaches_affected",
+    #             "perc_reaches_affected", "mean_csi", "count_nff", "perc_nff"])
+    # headers = glo.pop(0)
 
     return aggregate_global_stats(panda_df, csi_name, csi_threshold)
 
 
-def aggregate_global_stats(df, sce, threshold):
+def aggregate_global_stats(df:pd.DataFrame, sce:str, threshold:float):
     """
     Calculate global statistics
 
@@ -66,7 +68,7 @@ def aggregate_global_stats(df, sce, threshold):
         pct_nff]
 
 
-def export_global_stats_results_to_excel(name_sheet, result_list, writer):
+def export_global_stats_results_to_excel(name_sheet, result_list:list, writer):
     """
     Now export global stats with benchmarking results
 

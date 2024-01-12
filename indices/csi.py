@@ -1,4 +1,4 @@
-import cPickle
+import pickle as cPickle
 import os
 
 import numpy as np
@@ -6,9 +6,17 @@ import pandas as pd
 
 import tools.helper as tools
 
-def calculate_csi(streams_array, csi_field_name, dom_field_name,
-                  ff_field_name, fields, weights, flood_weight,
-                  csi_threshold, test_pickle_folder=''):
+def calculate_csi(
+        streams_array,
+        csi_field_name,
+        dom_field_name,
+        ff_field_name,
+        fields,
+        weights,
+        flood_weight,
+        csi_threshold,
+        test_pickle_folder=''
+    ):
     """
     Calculating the CSI and the DOM index
 
@@ -43,6 +51,9 @@ def calculate_csi(streams_array, csi_field_name, dom_field_name,
     # Adding floodplain weighting to road and urban only
     rdd = rdd + ((rdd * fld) * (flood_weight / 100))
     urb = urb + ((urb * fld) * (flood_weight / 100))
+
+    #Percent to decimal
+    urb = urb * 100
 
     # resetting to 100 in case weighting overshoots
     rdd[rdd > 100.0] = 100.0

@@ -1,4 +1,5 @@
-import arcpy
+#import arcpy
+
 import numpy as np
 import pandas as pd
 
@@ -9,7 +10,7 @@ fd = conf.var
 
 
 def post_stats_bench_single(
-        stream_array_mod,
+        stream_array_mod:pd.DataFrame,
         scenario_name,
         bench_fc,
         csi_threshold):
@@ -28,28 +29,35 @@ def post_stats_bench_single(
     bench = bench.set_index([fd.GOID])
 
     # Now preparing benchmark tables
-    panda_df_for_bench = pd.DataFrame(stream_array_mod)
+    panda_df_for_bench = stream_array_mod.copy()
     panda_df_for_bench = panda_df_for_bench.set_index([fd.GOID])
 
     join_bench = pd.merge(
         panda_df_for_bench,
         bench,
         left_index=True,
-        right_index=True)
+        right_index=True
+    )
 
     dom_field_name = scenario_name + str("_D")
     dom_bench = calculate_dominance_bench_rivers(
-        join_bench, dom_field_name, scenario_name, csi_threshold)
+        join_bench,
+        dom_field_name,
+        scenario_name,
+        csi_threshold
+    )
 
     # Benchmarking stats requires two steps.
-    number_matching_bench_rivers = benchmarking_rivers(join_bench,
-                                                       scenario_name,
-                                                       csi_threshold)
+    number_matching_bench_rivers = benchmarking_rivers(
+        join_bench,
+        scenario_name,
+        csi_threshold
+    )
 
     return number_matching_bench_rivers, dom_bench
 
 
-def calculate_dominance_bench_rivers(join, domField, FieldName, thres):
+def calculate_dominance_bench_rivers(join:pd.DataFrame, domField, FieldName, thres):
     """
     Function to determine the DOM index for rivers that failed benchmarking
 
@@ -59,15 +67,13 @@ def calculate_dominance_bench_rivers(join, domField, FieldName, thres):
     :param thres:
     :return:
     """
-    print(
-        "DOM: Calculating scenario {0} with threshold {1}".format(
-            FieldName,
-            thres))
+    print("DOM: Calculating scenario {0} with threshold {1}".format(FieldName, thres))
+
     join.loc[:, "SCE_NAME"] = FieldName
     join.loc[:, "NUM"] = 1
-    sel = join[join[FieldName] < thres]
+    sel:pd.DataFrame = join[join[FieldName] < thres]
 
-    if len(sel) == 0:
+    if sel.empty == 0:
         return pd.DataFrame([])
 
     fun = {
@@ -77,10 +83,11 @@ def calculate_dominance_bench_rivers(join, domField, FieldName, thres):
         "Name_Expert": 'first'}
     dom = sel.groupby(["FFRID", domField], as_index=False).agg(fun)
     dom.rename(columns={domField: 'Pressure'}, inplace=True)
+
     return dom
 
 
-def benchmarking_rivers(join, sce, threshold):
+def benchmarking_rivers(join:pd.DataFrame, sce, threshold):
     """
     Calculates number of matching rivers
 
@@ -106,7 +113,7 @@ def benchmarking_rivers(join, sce, threshold):
         fd.BENCH_SRC: 'first',
         fd.Name_Expert: 'first'}
 
-    one = join.groupby(fd.FFRID).agg(f)
+    one:pd.DataFrame = join.groupby(fd.FFRID).agg(f)
 
     # Then calculating if above threshold
     print ("using threshold " + str(threshold))
@@ -129,11 +136,6 @@ def benchmarking_rivers(join, sce, threshold):
     return number_matching_rivers
 
 
-def _load_streams(table, fields="*"):
-    arr = arcpy.da.TableToNumPyArray(table, fields, null_value=0)
-    return arr
-
-
 def _getLevelCode(x, var1):
     if x < var1:
         r = 0
@@ -142,7 +144,7 @@ def _getLevelCode(x, var1):
     return r
 
 
-def _loadBenchTable(bench_table):
+def _loadBenchTable(bench_table)->pd.DataFrame:
     """
     Load benchmarking table and return DataFrame
 
@@ -150,13 +152,12 @@ def _loadBenchTable(bench_table):
     :return:
     """
     fields = [fd.GOID, fd.FFRID, fd.BENCH_SRC, fd.Name_Expert]
-    input = _load_streams(bench_table, fields)
-    df = pd.DataFrame(input)
+    input = bench_table[fields]
 
-    return df
+    return input
 
 
-def export_benchmarking_dom_results(bench_dom, stamp, writer):
+def export_benchmarking_dom_results(bench_dom:pd.DataFrame, stamp, writer):
     """
     Now export benchmarking dominance stats
 
@@ -172,7 +173,7 @@ def export_benchmarking_dom_results(bench_dom, stamp, writer):
         bench_dom_sorted = bench_dom[[
             "SCE_NAME", "FFRID", "Name_Expert", "Pressure", "NUM",
             "BENCH_SRC"]]
-        for row in bench_dom_sorted._values:
+        for row in bench_dom_sorted.values:
             dom_bench_list.append([stamp] + [val for val in row])
     except Exception as err:
         print ("Something went wrong with calculating"

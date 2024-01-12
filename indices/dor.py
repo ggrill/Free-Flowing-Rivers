@@ -1,9 +1,10 @@
 from config import config
+import geopandas as gpd
 
 fd = config.var
 
 
-def calculate_dor(dams, streams, dor_field):  # List of OIDs
+def calculate_dor(dams:gpd.GeoDataFrame, streams:gpd.GeoDataFrame, dor_field):  # List of OIDs
     """
     Updates the degree of regulation (DOR) index, given a
     set of dams.
@@ -19,7 +20,7 @@ def calculate_dor(dams, streams, dor_field):  # List of OIDs
     disch = streams["DIS_AV_CMS"].tolist()
     svol = [0] * length
 
-    for dam in dams:
+    for index, dam in dams.iterrows():
 
         routing_list = set([])
         dam_oid = dam[fd.GOID]
@@ -36,7 +37,7 @@ def calculate_dor(dams, streams, dor_field):  # List of OIDs
                 svol[dam_oid - 1] += dam[fd.STOR_MCM]
 
                 new_dor = get_dor(disch[dam_oid - 1], svol[dam_oid - 1])
-                streams[dam_oid - 1][dor_field] = new_dor
+                streams.at[dam_oid - 1, dor_field] = new_dor
 
                 dw = ndoid[dam_oid - 1]
                 if dw != 0:
@@ -44,7 +45,7 @@ def calculate_dor(dams, streams, dor_field):  # List of OIDs
 
             dam_oid = new_node
 
-    return streams
+    return dams, streams
 
 
 def get_dor(discharge, storage):

@@ -1,12 +1,13 @@
 import logging
 import sys
+import os
 from collections import defaultdict
 
-import arcpy
+import geopandas as gpd
 
 import indices.sed
 from config import config
-from tools import helper
+import tools.helper as tool
 
 fd = config.var
 
@@ -19,49 +20,58 @@ def run_sed(para, paths):
     :param paths: output pathnames
     :return:
     """
-    streams_fc = para["streams_fc"]
-    dams_fc = para["dams_fc"]
+    streams_fc:gpd.GeoDataFrame = para["streams_fc"]
+    dams_fc:gpd.GeoDataFrame = para["dams_fc"]
+    lakes_fc:gpd.GeoDataFrame = para["lakes_fc"]
+
     svol_field = para["svol_field"]
     barrier_inc_field = para["barrier_inc_field"]
-    lakes_fc = para["lakes_fc"]
     sed_field = para["sed_field"]
-    out_gdb = paths["gdb_full_path"]
+    out_gpkg = paths["gpkg_full_path"]
 
     streams = load_streams(streams_fc)
     streams, convert_dict = update_stream_routing_index(streams)
 
-    barriers = load_barriers(dams_fc, convert_dict,
-                             svol_field, barrier_inc_field)
+    barriers = load_barriers(dams_fc, convert_dict, svol_field, barrier_inc_field)
+
     dam_volu_dict = barriers_calculate(barriers, svol_field)
 
     lakes = load_lakes(lakes_fc, convert_dict)
 
     small_lake_loss_dict, lake_volu_dict = indices.sed.lakes_calculate(lakes)
 
-    streams = indices.sed.calculate_sed(streams, dam_volu_dict, lake_volu_dict,
-                                        small_lake_loss_dict)
+    streams = indices.sed.calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict)
 
     prt("Exporting results sediment table")
 
-    outtbl = export_results_table(streams, out_gdb)
-
     # Adding indices helps with joining tables to geometry
-    arcpy.AddIndex_management(outtbl, fd.GOID, fd.GOID, "UNIQUE", "ASCENDING")
+    streams.sort_values(by=[fd.GOID, fd.GOID], inplace=True, ascending=True)
+    streams.to_file(out_gpkg, driver="GPKG", layer = "SED")
 
     # Update original database
     if para["update_mode"] == "YES":
-        print("Updating SED values in database {} ".format(streams_fc))
+        print(f"Updating SED values in database {streams_fc.head(1)}")
         try:
-            helper.copy_between(streams_fc, fd.GOID,
-                                sed_field, outtbl,
-                                fd.GOID, fd.SED,
-                                "overwrite", 0)
+            streams = tool.copy_between(
+                streams_fc,
+                fd.GOID,
+                sed_field,
+                streams,
+                fd.GOID,
+                fd.SED,
+                "overwrite",
+                0,
+            )
+            streams.to_file(out_gpkg, driver="GPKG", layer = "SED_COPIED")
+        
         except Exception as e:
             print (str(e))
             sys.exit(0)
+    
+    return streams[sed_field]
 
 
-def load_streams(stream_table):
+def load_streams(stream_table:gpd.GeoDataFrame):
     """
     Loading stream network and adding fields
 
@@ -74,42 +84,29 @@ def load_streams(stream_table):
             fd.DIS_AV_CMS, fd.BAS_ID, fd.UPLAND_SKM,
             fd.ERO_YLD_TON]
 
-    arr = arcpy.da.TableToNumPyArray(stream_table, flds)
+    tool.check_fields(stream_table, flds)
+    stream_table[flds].fillna(0)
 
-    arr = helper.add_fields(arr, [(fd.SED_LSS_LKS_OT_NAT, 'f8')])
-    arr = helper.add_fields(arr, [(fd.SED_LSS_LKS_IN_NAT, 'f8')])
-    arr = helper.add_fields(arr, [(fd.SED_NAT_UP, 'f8')])
-    arr = helper.add_fields(arr, [(fd.SED_NAT, 'f8')])
+    stream_table = tool.add_fields(stream_table, [
+        'f8',
+        fd.SED_LSS_LKS_OT_NAT,
+        fd.SED_LSS_LKS_IN_NAT,
+        fd.SED_NAT_UP,
+        fd.SED_NAT,
+        fd.SED_LSS_LKS_OT_ANT,
+        fd.SED_LSS_LKS_IN_ANT,
+        fd.SED_LSS_DMS_ANT,
+        fd.SED_ANT_UP,
+        fd.SED_ANT,
+        fd.SED_LSS_TOT,
+        fd.SED,
+        fd.SED_NAT,
+    ])
 
-    arr = helper.add_fields(arr, [(fd.SED_LSS_LKS_OT_ANT, 'f8')])
-    arr = helper.add_fields(arr, [(fd.SED_LSS_LKS_IN_ANT, 'f8')])
-    arr = helper.add_fields(arr, [(fd.SED_LSS_DMS_ANT, 'f8')])
-    arr = helper.add_fields(arr, [(fd.SED_ANT_UP, 'f8')])
-    arr = helper.add_fields(arr, [(fd.SED_ANT, 'f8')])
-
-    arr = helper.add_fields(arr, [(fd.SED_LSS_TOT, 'f8')])
-
-    arr = helper.add_fields(arr, [(fd.SED, 'f8')])
-
-    arr[fd.SED_NAT] = 0
-    arr[fd.SED_NAT_UP] = 0
-    arr[fd.SED_LSS_LKS_OT_NAT] = 0
-    arr[fd.SED_LSS_LKS_IN_NAT] = 0
-
-    arr[fd.SED_ANT] = 0
-    arr[fd.SED_ANT_UP] = 0
-    arr[fd.SED_LSS_LKS_OT_ANT] = 0
-    arr[fd.SED_LSS_LKS_IN_ANT] = 0
-    arr[fd.SED_LSS_DMS_ANT] = 0
-
-    arr[fd.SED_LSS_TOT] = 0
-
-    arr[fd.SED] = 0
-
-    return arr
+    return stream_table
 
 
-def update_stream_routing_index(streams):
+def update_stream_routing_index(streams:gpd.GeoDataFrame):
     """
     Function to sort the stream network using the upstream area. This allows
     the network to be processed in order from headwaters to the ocean. Afterwards
@@ -122,26 +119,27 @@ def update_stream_routing_index(streams):
     print("Updating stream index")
 
     # Maintain the old GOID values in a new field
-    streams = helper.add_fields(streams, [("OGOID", 'i4')])
+    streams:gpd.GeoDataFrame = tool.add_fields(streams, ["OGOID", 'i4'])
     streams["OGOID"] = streams["GOID"]
 
     # Sort the array by upland area and basin
     # This is key to being able to process river network from top to bottom
-    streams.sort(order=['BAS_ID', 'UPLAND_SKM'])
+    streams.sort_values(by=['BAS_ID', 'UPLAND_SKM'], inplace=True)
 
     # Create Routing Dictionaries and fill
     oid_dict = {}
-    convert_dict = {}
-    ups_dict = defaultdict(str)
-    down_dict = defaultdict(long)
 
     i = 1
-    for myrow in streams:
-        oid_dict[int(myrow["GOID"])] = i
+    for index, myrow in streams.iterrows():
+        oid_dict[myrow['GOID']] = i
         i += 1
 
+    convert_dict = {}
+    ups_dict = defaultdict(str)
+    down_dict = defaultdict(float)
+
     i = 1
-    for myrow in streams:
+    for index, myrow in streams.iterrows():
         dn_old_oid = myrow["NDOID"]
         new_oid = oid_dict.get(int(dn_old_oid), -1)
 
@@ -156,20 +154,21 @@ def update_stream_routing_index(streams):
             else:
                 new_value = str(exi_value) + '_' + str(i)
                 ups_dict[int(new_oid)] = new_value
+
         i += 1
 
     # Writing index values back to numpy
     i = 1
-    for myrow in streams:
-        myrow["NOID"] = i
-        myrow["NDOID"] = down_dict[i]
-        myrow["NUOID"] = ups_dict[i]
+    for index, myrow in streams.iterrows():
+        streams.at[index, "NOID"] = i
+        streams.at[index, "NDOID"] = down_dict[i]
+        streams.at[index, "NUOID"] = ups_dict[i]
 
         i = i + 1
 
     # Create Dictionary to convert old (KEY) to new (VALUE)
     i = 1
-    for myrow in streams:
+    for _, myrow in streams.iterrows():
         old = myrow["OGOID"]
         new = myrow["NOID"]
         convert_dict[int(old)] = new
@@ -178,7 +177,7 @@ def update_stream_routing_index(streams):
     return streams, convert_dict
 
 
-def load_lakes(lakes_table, convert_dict):
+def load_lakes(lakes_table:gpd.GeoDataFrame, convert_dict:dict)->gpd.GeoDataFrame:
     """
     Load lakes and add field for sediment trapping calculations
 
@@ -192,21 +191,19 @@ def load_lakes(lakes_table, convert_dict):
     flds = ["GOID", "GOOD", "Lake_type", "SED_ACC", "IN_STREAM", "IN_CATCH",
             "Vol_total", "Dis_avg", "Res_time"]
 
-    arr = arcpy.da.TableToNumPyArray(lakes_table, flds, null_value=0)
+    lakes_table[flds].fillna(0)
 
-    arr = helper.add_fields(arr, [("TE_brune", 'f8')])
-    arr = helper.add_fields(arr, [("LOSS_LKES_OUT_NET", 'f8')])
+    lakes_table = tool.add_fields(lakes_table, ["TE_brune", "LOSS_LKES_OUT_NET"])
+    lakes_table["TE_brune"] = 0
+    lakes_table["LOSS_LKES_OUT_NET"] = 0
 
-    arr["TE_brune"] = 0
-    arr["LOSS_LKES_OUT_NET"] = 0
+    for index, a in lakes_table.iterrows():
+        lakes_table.at[index, "GOID"] = convert_dict.get(a["GOID"], 0)
 
-    for a in arr:
-        a["GOID"] = convert_dict.get(a["GOID"], 0)
-
-    return arr
+    return lakes_table
 
 
-def load_barriers(barriers_table, convert_dict, svol_field, barrier_inc_field):
+def load_barriers(barriers_table:gpd.GeoDataFrame, convert_dict:dict, svol_field, barrier_inc_field)->gpd.GeoDataFrame:
     """
     Loading dams and converting old to new
 
@@ -221,19 +218,18 @@ def load_barriers(barriers_table, convert_dict, svol_field, barrier_inc_field):
     # Existing fields to load
     flds = [fd.GOID, fd.NOID, svol_field, fd.INC, barrier_inc_field]
 
-    # Load the array from file
-    arr = arcpy.da.TableToNumPyArray(barriers_table, flds, null_value=0)
+    barriers_table[flds].fillna(0)
 
-    for a in arr:
-        a[fd.GOID] = convert_dict.get(a[fd.GOID], 0)
+    for index, a in barriers_table.iterrows():
+        barriers_table.at[index, fd.GOID] = convert_dict.get(a[fd.GOID], 0)
 
     # Select only dams that are included in analysis through field INC or INC1
-    arr2 = arr[(arr[barrier_inc_field] == 1) & (arr[fd.INC] == 1)]
+    barriers_table = barriers_table[(barriers_table[barrier_inc_field] == 1) & (barriers_table[fd.INC] == 1)]
 
-    return arr2
+    return barriers_table
 
 
-def barriers_calculate(barriers, svol_field):
+def barriers_calculate(barriers:gpd.GeoDataFrame, svol_field):
     """
     In some cases, there are multiple reservoirs located on a river reach.
     This function calculates the sum of reservoir volume for each river reach.
@@ -244,17 +240,11 @@ def barriers_calculate(barriers, svol_field):
     """
     dam_volu_dict = {}
 
-    for b in barriers:
+    for _, b in barriers.iterrows():
         goid = b[fd.GOID]
         dam_volu_dict[goid] = dam_volu_dict.get(goid, 0) + b[svol_field]
 
     return dam_volu_dict
-
-
-def export_results_table(streams, out_gdb):
-    out_tbl = out_gdb + "\\sed"
-    arcpy.da.NumPyArrayToTable(streams[[fd.GOID, fd.SED]], out_tbl)
-    return out_tbl
 
 
 def prt(txt):

@@ -1,7 +1,8 @@
-import cPickle
+import pickle as cPickle
 import os
 
-import arcpy
+#import arcpy
+
 import numpy as np
 import pandas as pd
 
@@ -15,7 +16,6 @@ def pst_csi_calculations(dir):
     :param dir: directory where pickles have been saved
     :return: saves a geodatabase table with CSI statistics
     """
-    gdb_full_path, gdb_file_name = tools.create_gdb(dir, "stats_csi")
 
     print ("Processing sensitivity analysis")
 
@@ -27,7 +27,7 @@ def pst_csi_calculations(dir):
         # NAME.csi files represent scenario run with CSI values of each river reach
         if filename.endswith(".csi"):
             x = x + 1
-            print filename
+            print(filename)
             fil = os.path.join(dir, filename)
             # Load the pickle options back into model
             # https://stackoverflow.com/a/899199/344647
@@ -67,14 +67,10 @@ def pst_csi_calculations(dir):
 
     concatentated = pd.concat(mc_results, axis=1)
 
-    print "Percentile Stats"
+    print("Percentile Stats")
     df = pd.DataFrame(concatentated)
     df.columns = ['CSI_AVG', 'CSI_MIN', 'CSI_MAX', 'CSI_RNG', 'CSI_STD']
+    
+    df.to_csv(dir + r"/stats_csi.csv")
 
-    # Turn panda to numpy
-    # https://my.usgs.gov/confluence/display/cdi/pandas.DataFrame+to+ArcGIS+Table
-    x = np.array(np.rec.fromrecords(df.values))
-    names = df.dtypes.index.tolist()
-    x.dtype.names = tuple(names)
-
-    arcpy.da.NumPyArrayToTable(x, gdb_full_path)
+    return df

@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flask Python",
+            "request": "launch",
+            "type": "python",
+            "program": "fra_start.py", // Substitua pelo caminho do seu arquivo principal
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
