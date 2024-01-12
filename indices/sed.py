@@ -1,11 +1,11 @@
 import math
 import logging
 import config.config
-
+import geopandas as gpd
 fd = config.config.var
 
 
-def lakes_calculate(lakes):
+def lakes_calculate(lakes:gpd.GeoDataFrame):
     """
     Calculate the trapping of sediments in natural lakes
 
@@ -31,7 +31,7 @@ def lakes_calculate(lakes):
     large_lake_volu_dict = {}
 
     # Iterate through the lakes and extract values, fill dictionaries etc.
-    for lake in lakes:
+    for _, lake in lakes.iterrows():
         goid = lake["GOID"]
 
         if lake["IN_STREAM"] == 0:
@@ -52,7 +52,7 @@ def lakes_calculate(lakes):
     return small_lake_loss_dict, large_lake_volu_dict
 
 
-def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
+def calculate_sed(streams:gpd.GeoDataFrame, dam_volu_dict:dict, lake_volu_dict:dict, small_lake_loss_dict:dict):
     """
     Calculates the Sediment Trapping Index (SED)
 
@@ -74,7 +74,7 @@ def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
     prt("***************************************************")
     prt("")
 
-    for stream in streams:
+    for _, stream in streams.iterrows():
 
         dis = stream[fd.DIS_AV_CMS]
         noid = stream[fd.NOID]
@@ -95,8 +95,7 @@ def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
         stream[fd.SED_LSS_LKS_OT_NAT] = loss_lakes_outside_net
 
         # 2) Account for losses from natural lakes inside network (Type 1)
-        loss_lakes_in_nat = sed_nat - (
-                sed_nat * TE(vol_lakes_in_network, dis))
+        loss_lakes_in_nat = sed_nat - (sed_nat * TE(vol_lakes_in_network, dis))
 
         # Write into table
         stream[fd.SED_LSS_LKS_IN_NAT] = loss_lakes_in_nat
@@ -107,9 +106,8 @@ def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
         stream[fd.SED_NAT] = sed_nat
 
         # Add the results to next downstream reach
-        if streams[stream[fd.NOID] - 1][fd.NDOID] <> 0:
-            streams[stream[fd.NDOID] - 1][fd.SED_NAT_UP] = \
-                streams[stream[fd.NDOID] - 1][fd.SED_NAT_UP] + sed_nat
+        if (stream[fd.NOID]-1 in streams.index) and (stream[fd.NDOID]-1 in streams.index) and (streams.loc[stream[fd.NOID]-1][fd.NDOID] != 0):
+            streams.at[stream[fd.NDOID]-1, fd.SED_NAT_UP] = streams.loc[stream[fd.NDOID]-1][fd.SED_NAT_UP] + sed_nat
 
     # 2) Accumulate sediments taking into account lakes inside and
     # outside the network and dams
@@ -122,7 +120,7 @@ def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
     prt("***************************************************")
     prt("")
 
-    for stream in streams:
+    for index, stream in streams.iterrows():
 
         dis = stream[fd.DIS_AV_CMS]
         noid = stream[fd.NOID]
@@ -141,35 +139,32 @@ def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
         sed_ant = sed_ant - loss_lakes_outside_net
 
         # Write into table
-        stream[fd.SED_LSS_LKS_OT_ANT] = loss_lakes_outside_net
+        streams.at[index, fd.SED_LSS_LKS_OT_ANT] = loss_lakes_outside_net
 
         # 2) Account for losses from natural lakes inside network
         # (Type 1) and dams
 
         # First process the lakes, ....
-        loss_lakes_in_ant = sed_ant - (
-                sed_ant * TE(vol_lakes_in_network, dis))
+        loss_lakes_in_ant = sed_ant - (sed_ant * TE(vol_lakes_in_network, dis))
         # ... and substract the losses from lakes, ....
         sed_ant = sed_ant - loss_lakes_in_ant
         # then process the dams.....
-        loss_dams_in_ant = sed_ant - (
-                sed_ant * TE(vol_dams, dis))
+        loss_dams_in_ant = sed_ant - (sed_ant * TE(vol_dams, dis))
         # ... and substract the losses from dams
         sed_ant = sed_ant - loss_dams_in_ant
 
         # Write into table
-        stream[fd.SED_LSS_LKS_IN_ANT] = loss_lakes_in_ant
+        streams.at[index, fd.SED_LSS_LKS_IN_ANT] = loss_lakes_in_ant
 
         # Write into table
-        stream[fd.SED_LSS_DMS_ANT] = loss_dams_in_ant
+        streams.at[index, fd.SED_LSS_DMS_ANT] = loss_dams_in_ant
 
         # 3) Write to table
-        stream[fd.SED_ANT] = sed_ant
+        streams.at[index, fd.SED_ANT] = sed_ant
 
         # Add the results to next downstream reach
-        if streams[stream[fd.NOID] - 1][fd.NDOID] <> 0:
-            streams[stream[fd.NDOID] - 1][fd.SED_ANT_UP] = \
-                streams[stream[fd.NDOID] - 1][fd.SED_ANT_UP] + sed_ant
+        if (stream[fd.NOID] - 1 in streams.index) and (stream[fd.NDOID] - 1 in streams.index) and (streams.loc[stream[fd.NOID] - 1][fd.NDOID] != 0):
+            streams.at[stream[fd.NDOID] - 1, fd.SED_ANT_UP] = streams.loc[stream[fd.NDOID] - 1][fd.SED_ANT_UP] + sed_ant
 
     # 3) Calculate the difference between 3 and 2, which is the
     # losses due to dams
@@ -182,13 +177,13 @@ def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
     prt("***************************************************")
     prt("")
 
-    for stream in streams:
+    for index, stream in streams.iterrows():
         sed_nat = stream[fd.SED_NAT]
         sed_ant = stream[fd.SED_ANT]
 
         sediment_loss = sed_nat - sed_ant
 
-        stream[fd.SED_LSS_TOT] = sediment_loss
+        streams.at[index, fd.SED_LSS_TOT] = sediment_loss
 
         # Make sure there is no division by zero error
         if sed_nat > 0.000000001:
@@ -197,11 +192,11 @@ def calculate_sed(streams, dam_volu_dict, lake_volu_dict, small_lake_loss_dict):
 
             # Clip values smaller than 0.1 just like for DOR
             if sti >= 0.1:
-                stream[fd.SED] = 100 * (sediment_loss / sed_nat)
+                streams.at[index, fd.SED] = 100 * (sediment_loss / sed_nat)
             else:
-                stream[fd.SED] = 0
+                streams.at[index, fd.SED] = 0
         else:
-            stream[fd.SED] = 0
+            streams.at[index, fd.SED] = 0
 
     return streams
 

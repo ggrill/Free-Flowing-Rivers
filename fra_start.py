@@ -44,32 +44,46 @@ def start(stamp, sequence, para, scenarios, st_flds, paths):
     else:
         pass
 
+    dof = 0
+    dor = 0
+    sed = 0
+    csi = 0
+
     if sequence["run_dof"] == "YES":
-        prt('\n' + "*********")
+        prt("*********")
         prt("RUN DOF")
         prt("*********" + '\n')
 
-        ffr_run_dof.run_dof(stamp, para, paths)
+        dof = ffr_run_dof.run_dof(stamp, para, paths)
+
     if sequence["run_dor"] == "YES":
-        prt('\n' + "*********")
+        prt("*********")
         prt("RUN DOR")
         prt("*********" + '\n')
 
-        ffr_run_dor.run_dor(stamp, para, paths)
+        dor = ffr_run_dor.run_dor(stamp, para, paths)
 
     if sequence["run_sed"] == "YES":
-        prt('\n' + "*********")
+        prt("*********")
         prt("RUN SED")
         prt("*********" + '\n')
 
-        ffr_run_sed.run_sed(para, paths)
+        sed = ffr_run_sed.run_sed(para, paths)
+
+    # Atualizando as colunas com os novos valores para o cálculo do CSI
+        
+    para['streams_fc']["DOF"] = dof
+    para['streams_fc']["DOR"] = dor
+    para['streams_fc']["SED"] = sed
 
     if sequence["run_csi"] == "YES":
-        prt('\n' + "*********")
+        prt("*********")
         prt("RUN CSI")
         prt("*********" + '\n')
 
         ffr_run_csi.run_csi(stamp, para, scenarios, st_flds, paths)
+    
+    print("Fim")
 
 
 def setup(base, out, xls_full, stamp, xls_file_name):
@@ -84,8 +98,8 @@ def setup(base, out, xls_full, stamp, xls_file_name):
     :return:
     """
     # Create CSI geodatabase
-    gdb_name = "CSI"
-    gdb_full_path, gdb_file_name = tools.create_gdb(out, gdb_name)
+    gpkg_name = "CSI"
+    gpkg_full_path, gpkg_file_name = tools.create_gpkg(out, gpkg_name)
 
     # Make statistics folder, where excel files are stored
     sta_folder = os.path.join(out, "STAT")
@@ -105,16 +119,20 @@ def setup(base, out, xls_full, stamp, xls_file_name):
 
     # Copy Excel-file into results folder for documentation
     shutil.copy(xls_full, out + "\\" + xls_file_name)
-    cde_folder = os.path.join(out, "CODE")
-    tools.create_path(cde_folder)
+
+    ########### its realy necessary? I'm generate a .exe program
 
     # Copy entire code directory into output folder for reference
-    tools.copytree(src=base, dst=cde_folder)
+    # cde_folder = os.path.join(out, "CODE")
+    # tools.create_path(cde_folder)
+    # tools.copytree(src=base, dst=cde_folder)
 
     # Copy Python code into results folder for documentation
-    python_code = os.path.abspath(__file__)
-    tail = os.path.basename(python_code)
-    shutil.copy(xls_full, out + "\\" + tail)
+    # python_code = os.path.abspath(__file__)
+    # tail = os.path.basename(python_code)
+    # shutil.copy(xls_full, out + "\\" + tail)
+
+    ############################################################
 
     # Setup logging
     tools.setup_logging(out)
@@ -125,7 +143,7 @@ def setup(base, out, xls_full, stamp, xls_file_name):
 
     paths = {"writer": writer,
              "excel_file": excel_file,
-             "gdb_full_path": gdb_full_path,
+             "gpkg_full_path": gpkg_full_path,
              "sta_csi_folder": sta_csi_folder,
              "sta_pickle_folder": sta_pickle_folder,
              "test_pickle_folder": test_pickle_folder}
@@ -138,7 +156,7 @@ def prt(txt):
     print(txt)
 
 
-def main():
+def main(xlsx_file:str, path_process_files:str):
     time_stamp = tools.get_stamp()
 
     print("Starting model at {}".format(datetime.datetime.now()))
@@ -146,12 +164,10 @@ def main():
     path = os.path.realpath(__file__)
     basepath, filename = os.path.split(path)
 
-    xls_full_path = os.path.join(basepath + r"\\config", "config.xlsx")
-
-    xls_path, xls_filename = os.path.split(xls_full_path)
+    xls_path, xls_filename = os.path.split(xlsx_file)
 
     # Loading model parameters from EXCEL file
-    sequence, para, scenarios, fields = tools.load_parameters(xls_full_path)
+    sequence, para, scenarios, fields = tools.load_parameters(xlsx_file, path_process_files)
 
     # Create a time-stamped folder under "output_folder"
     output_folder = os.path.join(para["output_folder"], "Results_" + time_stamp)
@@ -173,7 +189,7 @@ def main():
     # 1 Setting up file structure
     paths = setup(base=basepath,
                   out=output_folder,
-                  xls_full=xls_full_path,
+                  xls_full=xlsx_file,
                   stamp=time_stamp,
                   xls_file_name=xls_filename)
 
@@ -185,4 +201,14 @@ def main():
 # ----- ## ----- ## ----- ## ----- ## ----- ## ----- ## ----- ## ----- ##
 
 if __name__ == '__main__':
-    main()
+
+    path = os.path.realpath(__file__)
+    basepath, filename = os.path.split(path)
+
+    # Pasta com os dados pré processados
+    path_process_files = r"test/SAIDA.gpkg"
+
+    # Arquivo Excel
+    xlsx_file = r"F:\Projetos\Hidrobr\Free-Flowing-Rivers\config.xlsx" #os.path.join(basepath + r"\\config", "config.xlsx")
+
+    main(xlsx_file, path_process_files)

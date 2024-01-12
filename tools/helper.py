@@ -1,4 +1,4 @@
-import cPickle
+import pickle as cPickle
 import datetime
 import logging
 import os
@@ -6,9 +6,12 @@ import shutil
 import stat
 import sys
 import time
+import geopandas as gpd
+import fiona
 from collections import defaultdict
 
-import arcpy
+#import arcpy
+
 import numpy as np
 import pandas as pd
 # Creates an global object from the config class var. This holds the
@@ -46,7 +49,7 @@ def get_stamp():
     return stamp
 
 
-def check_fields(table, flds):
+def check_fields(file, flds):
     """
 
     Check if multiple fields exist
@@ -55,13 +58,15 @@ def check_fields(table, flds):
     :param flds: Fields to check
 
     """
-    fld_list = arcpy.ListFields(table)
-    x = [a.name for a in fld_list]
+
+    fld_list:list[str] = []
+    if isinstance(file, (gpd.GeoDataFrame, gpd.GeoDataFrame)):
+        fld_list = file.columns.to_list()
 
     count_wrong = 0
     for fld in flds:
-        if fld not in x:
-            print ("Field {} does not exist".format(fld))
+        if fld not in fld_list:
+            print (f"Field {fld} does not exist")
 
             count_wrong += 1
 
@@ -80,7 +85,8 @@ def check_field(table, fld):
     :param fld: Field to check
 
     """
-    fld_list = arcpy.ListFields(table)
+    #fld_list = arcpy.ListFields(table)
+    fld_list = table.columns.toList()
     x = [a.name for a in fld_list]
 
     if fld not in x:
@@ -97,10 +103,12 @@ def check_esri_item(path_to_item):
     :return:
     """
 
-    if arcpy.Exists(path_to_item):
+    #if arcpy.Exists(path_to_item):
+    if os.path.exists(path_to_item):
         pass
     else:
-        arcpy.AddMessage("%s does not exist" % path_to_item)
+        #arcpy.AddMessage("%s does not exist" % path_to_item)
+        print(f"{path_to_item} does not exist")
         sys.exit(-99)
 
 
@@ -167,7 +175,7 @@ def copytree(src, dst, symlinks=False, ignore=None):
                 print ("Perhaps the EXCEL file is still open?")
 
 
-def add_fields(array, desc):
+def add_fields(df:pd.DataFrame, desc:list):
     """
     Adds fields to a numpy array
 
@@ -177,14 +185,19 @@ def add_fields(array, desc):
     :param desc:
     :return:
     """
-    if array.dtype.fields is None:
-        arcpy.AddMessage("A must be a structured numpy array")
+    # if array.dtype.fields is None:
+    #     print("A must be a structured numpy array")
 
-    b = np.empty(array.shape, dtype=array.dtype.descr + desc)
-    for name in array.dtype.names:
-        b[name] = array[name]
-    return b
+    # b = np.empty(array.shape, dtype=array.dtype.descr + desc)
+    # for name in array.dtype.names:
+    #     b[name] = array[name]
+    # return b
 
+    for name in desc:
+        df[name] = 0
+    
+    return df
+    
 
 def delete_field(esri_table, list_of_field_names):
     """
@@ -199,7 +212,10 @@ def delete_field(esri_table, list_of_field_names):
     for f in list_of_field_names:
         if check_field(table=esri_table, fld=f):
             try:
-                arcpy.DeleteField_management(esri_table, f)
+                if f in esri_table.columns:
+                    esri_table.drop(columns=f, inplace=True)
+                #arcpy.DeleteField_management(esri_table, f)
+
                 print ("Deleted %s" % f)
 
             except Exception as ErrorDesc:
@@ -207,27 +223,18 @@ def delete_field(esri_table, list_of_field_names):
                 print(str(ErrorDesc))
 
 
-def add_index(lyr, field_name):
-    try:
-        if not index_exists(lyr, field_name):
-            arcpy.AddIndex_management(lyr, field_name, field_name, "UNIQUE", "ASCENDING")
-    except Exception as error:
-        print ("Adding index {} not successful. {}".format(field_name, str(error)))
+def add_index(lyr:pd.DataFrame, field_name):
+    if field_name in lyr.columns:
+        lyr.set_index(field_name, inplace=True)
+    else:
+        print (f"Adding index {field_name} not successful.")
 
 
-def index_exists(tablename, indexname):
-    if not arcpy.Exists(tablename):
-        return False
-
-    tabledescription = arcpy.Describe(tablename)
-
-    for iIndex in tabledescription.indexes:
-        if iIndex.Name == indexname:
-            return True
-    return False
+def index_exists(table:pd.DataFrame, indexname):
+    return indexname in table.index
 
 
-def update_stream_routing_index(streams):
+def update_stream_routing_index(streams:gpd.GeoDataFrame)->gpd.GeoDataFrame:
     """
     Function to recalculate the Network OIDs of a stream network, if the
     stream network was extracted from the global network. In this case the
@@ -242,31 +249,34 @@ def update_stream_routing_index(streams):
     """
 
     for n in ["GOID", "NOID", "NDOID", "NUOID"]:
-        if not n in streams.dtype.names:
-            raise Exception("Field {} does not exist".format(n))
+        if n not in streams.columns:
+            raise Exception(f"Field {n} does not exist")
 
     # river network must be global or extracted from global. NOID NDOID and
     # NUOID must not be sorted
-    if streams["NOID"][0] != streams["GOID"][0]:
-        raise Exception("It seems like you are attempting to resort "
-                        "a network that has already been sorted. "
-                        "This would be confusing, please use an extract of "
-                        "the original network")
+    if streams["NOID"].values[0] != streams["GOID"].values[0]:
+        print("Routing index all updated")
+        return streams
+        # raise Exception("It seems like you are attempting to resort "
+        #                 "a network that has already been sorted. "
+        #                 "This would be confusing, please use an extract of "
+        #                 "the original network")
 
-    # print("Updating routing index")
+    print("Updating routing index")
     # Create Routing Dictionaries and fill
 
     oidDict = {}
     upsDict = defaultdict(str)
-    downDict = defaultdict(long)
+    downDict = defaultdict(float)
 
     i = 1
-    for myrow in streams:
-        oidDict[int(myrow[fd.GOID])] = i
+    for index, myrow in streams.iterrows():
+        val = myrow[fd.GOID]
+        oidDict[int(val)] = i
         i += 1
 
     i = 1
-    for myrow in streams:
+    for index, myrow in streams.iterrows():
         dnOldOID = myrow[fd.NDOID]
         newOid = oidDict.get(int(dnOldOID), -1)
 
@@ -285,10 +295,10 @@ def update_stream_routing_index(streams):
 
     # Writing index values back to numpy
     i = 1
-    for myrow in streams:
-        myrow[fd.NOID] = i
-        myrow[fd.NDOID] = downDict[i]
-        myrow[fd.NUOID] = upsDict[i]
+    for index, myrow in streams.iterrows():
+        streams.at[index, fd.NOID] = i
+        streams.at[index, fd.NDOID] = downDict[i]
+        streams.at[index, fd.NUOID] = upsDict[i]
 
         i = i + 1
 
@@ -314,55 +324,47 @@ def create_path(path):
         print (str(err))
 
 
-def copy_between(to_join_fc, to_join_field, IntoJoinField, FromJoinFC,
-                 FromJoinField, FromValueField, over_mode=True,
-                 over_value=0):
+def copy_between(
+        to_join_fc:gpd.GeoDataFrame,
+        to_join_field,
+        IntoJoinField,
+        FromJoinFC:gpd.GeoDataFrame,
+        FromJoinField,
+        FromValueField,
+        over_mode=True,
+        over_value=0
+    ):
     """
     Copies data between tables
     """
 
-    print ("Updating tables")
+    print("Updating tables")
 
-    from_valueDict = defaultdict(float)
+    from_value_dict = FromJoinFC[FromValueField].to_dict()
 
-    to_flds = [to_join_field, IntoJoinField]
+    # Writing values to TO GeoDataFrame
+    for index, row1 in to_join_fc.iterrows():
+        to_join_field_value = row1[to_join_field]
+        new_value = from_value_dict.get(to_join_field_value)
 
-    # Loading the values from FROM table
-    from_flds = [FromJoinField, FromValueField]
-    with arcpy.da.SearchCursor(FromJoinFC, from_flds) as cursor:
-        for myrow in cursor:
-            from_valueDict[myrow[0]] = myrow[1]
+        if new_value is None:
+            if over_mode:
+                # This overwrites the values in the TO GeoDataFrame
+                # with zero values for IDs not present in FROM GeoDataFrame
+                row1[IntoJoinField] = over_value
+        else:
+            row1[IntoJoinField] = new_value
 
-    # Writing values to TO table
-    with arcpy.da.UpdateCursor(to_join_fc, to_flds) as cursor:
-        for row1 in cursor:
-            ToJoinFieldValue = row1[0]
-            newValue = from_valueDict.get(ToJoinFieldValue)
-
-            if newValue is None:
-                if over_mode is True:
-                    # This overwrites the values in the TO table
-                    # with zero values for IDs not present in FROM table
-                    # Default for updating DOR DOF results
-
-                    # If you just want to update certain values from one table
-                    # to the other and leave all other rows untouched,
-                    # then use the "update" over_mode
-
-                    row1[1] = over_value
-            else:
-                row1[1] = newValue
-
-            cursor.updateRow(row1)
+    return to_join_fc
 
 
 def get_writer(base_dir, stamp):
     # Setup a Excel Writer target file
-    excel_file_output = os.path.join(base_dir, "results_" + stamp + ".xls")
+    excel_file_output = os.path.join(base_dir, "results_" + stamp + ".xlsx")
     return pd.ExcelWriter(excel_file_output), excel_file_output
 
 
-def export_excel(df, name, writer, id=False, startrow=0,
+def export_excel(df:pd.DataFrame, name, writer, id=False, startrow=0,
                  header=False, first=False):
     try:
         startrow = len(writer.sheets[name].rows)
@@ -381,10 +383,9 @@ def export_excel(df, name, writer, id=False, startrow=0,
         writer,
         name,
         index=False,
-        encoding='utf-8',
         startrow=startrow,
         header=header)
-    writer.save()
+    #writer.save()
 
 
 def create_results_sheet(writer):
@@ -440,7 +441,7 @@ def create_results_sheet(writer):
     export_excel(dom_bench_pd, "Bench_dom", writer, first=True)
 
 
-def load_parameters(path):
+def load_parameters(path, path_process_files):
     start_dict = defaultdict()
     value_dict = defaultdict()
 
@@ -451,7 +452,7 @@ def load_parameters(path):
         xls = pd.ExcelFile(path)
         sheet_names = xls.sheet_names
     except Exception as err:
-        print ("Error opening file. Does it exist? {}").format(str(err))
+        print(f"Error opening file. Does it exist? {err}")
         sys.exit()
 
     # Checking the sheets.
@@ -485,7 +486,7 @@ def load_parameters(path):
 
     for sname in ["settings_sheet", "scenarios_sheet", "run_dof", "run_dor", "run_sed", "run_csi"]:
         if sname not in start_dict.keys():
-            print "\r\n" + "Start variable not found: {}".format(sname)
+            print(f"\r\nStart variable not found: {sname}")
             sys.exit()
 
     set_sheet = start_dict["settings_sheet"]
@@ -501,7 +502,7 @@ def load_parameters(path):
         settings_sheet = xls.parse(set_sheet)
     except Exception as e:
         print (str(e))
-        print "Does sheet {} exist?".format(set_sheet)
+        print(f"Does sheet {set_sheet} exist?")
         sys.exit()
 
     var1 = settings_sheet['Key']
@@ -519,7 +520,7 @@ def load_parameters(path):
         sce_sheet = xls.parse(sce_sheet)
     except Exception as e:
         print (str(e))
-        print "Does sheet {} exist?".format(sce_sheet)
+        print(f"Does sheet {sce_sheet} exist?")
         sys.exit()
 
     # Check if fields are there
@@ -545,7 +546,7 @@ def load_parameters(path):
 
     for h in header:
         if h not in sce_sheet.columns:
-            print "{} not found".format(h)
+            print(f"{h} not found")
 
     field_set = set()
 
@@ -564,12 +565,32 @@ def load_parameters(path):
         sce_list.append([scename, list_of_fields, list_of_weights,
                          csi_thresh, flood_damp, filter_thresh, process,
                          export])
+    
+    layers = fiona.listlayers(path_process_files)
+
+    dams_fc:gpd.GeoDataFrame = None
+    streams_fc:gpd.GeoDataFrame = None
+    lakes_fc:gpd.GeoDataFrame = None
+    bench_fc:gpd.GeoDataFrame = None
+
+    if value_dict['dams_fc'] in layers:
+        dams_fc = gpd.read_file(path_process_files, driver = "GPKG", layer = value_dict['dams_fc'])
+    if value_dict['streams_fc'] in layers:
+        streams_fc = gpd.read_file(path_process_files, driver = "GPKG", layer = value_dict['streams_fc'])
+    if value_dict['lakes_fc'] in layers:
+        lakes_fc = gpd.read_file(path_process_files, driver = "GPKG", layer = value_dict['lakes_fc'])
+    if value_dict['bench_fc'] in layers:
+        bench_fc = gpd.read_file(path_process_files, driver = "GPKG", layer = value_dict['bench_fc'])
+    
+    value_dict['dams_fc'] = dams_fc
+    value_dict['streams_fc'] = streams_fc
+    value_dict['lakes_fc'] = lakes_fc
+    value_dict['bench_fc'] = bench_fc
 
     return sequence, value_dict, sce_list, list(field_set)
 
 
-def load_stream_array(stream_feature_class, stream_fields, use_npy=0,
-                      fname=""):
+def load_stream_array(stream_feature_class, stream_fields, use_npy=0, fname=""):
     """
     Loading input stream feature class (river network) to numpy array.
     Optionally, the stream feature class can bes saved as a numpy memory
@@ -583,59 +604,61 @@ def load_stream_array(stream_feature_class, stream_fields, use_npy=0,
     :return:
     """
 
-    def save_arr(arr, loc):
-        try:
-            np.save(loc, arr)
-        except BaseException:
-            print ("Unexpected error:", sys.exc_info()[0])
-            raise
+    # def save_arr(arr, loc):
+    #     try:
+    #         np.save(loc, arr)
+    #     except BaseException:
+    #         print ("Unexpected error:", sys.exc_info()[0])
+    #         raise
 
-    def load_arr(loc):
-        try:
-            return np.load(loc)
-        except BaseException:
-            print ("Unexpected error:", sys.exc_info()[0])
-            raise
+    # def load_arr(loc):
+    #     try:
+    #         return np.load(loc)
+    #     except BaseException:
+    #         print ("Unexpected error:", sys.exc_info()[0])
+    #         raise
 
-    if use_npy == 1:
-        if os.path.isfile(fname):
-            print ("Loading stream array from npy object")
-            arr = load_arr(fname)
-        else:
-            print ("Loading stream array from feature class, then save as "
-                   "array")
-            arr = arcpy.da.TableToNumPyArray(stream_feature_class,
-                                             stream_fields)
-            print ("Saving stream array to npy object")
-            save_arr(arr, fname)
-    else:
-        print ("Loading stream array from feature class")
-        arr = arcpy.da.TableToNumPyArray(stream_feature_class, stream_fields)
+    # if use_npy == 1:
+    #     if os.path.isfile(fname):
+    #         print ("Loading stream array from npy object")
+    #         arr = load_arr(fname)
+    #     else:
+    #         print ("Loading stream array from feature class, then save as array")
+    #         arr = arcpy.da.TableToNumPyArray(
+    #             stream_feature_class,
+    #             stream_fields
+    #         )
+
+    #         print ("Saving stream array to npy object")
+    #         save_arr(arr, fname)
+    # else:
+    #     print ("Loading stream array from feature class")
+    #     arr = arcpy.da.TableToNumPyArray(stream_feature_class, stream_fields)
 
     # Test if Global network or extracted network
     # If extracted, the routing index must be updated
-    update_stream_routing_index(arr)
-    return arr
+    stream_feature_class = update_stream_routing_index(stream_feature_class)
+    return stream_feature_class
 
 
-def create_gdb(gdb_folder, gdb_name):
+def create_gpkg(gpkg_folder, gpkg_name):
     """
     Creates a path and a geodatabase
 
-    :param gdb_folder:
-    :param gdb_name:
+    :param gpkg_folder:
+    :param gpkg_name:
     :return:
     """
 
-    if not os.path.exists(gdb_folder):
-        os.makedirs(gdb_folder)
+    if not os.path.exists(gpkg_folder):
+        os.makedirs(gpkg_folder)
 
-    gdb_file_name = gdb_name + ".gdb"
-    gdb_full_path = gdb_folder + "\\" + gdb_file_name
+    gpkg_file_name = gpkg_name + ".gpkg"
+    gpkg_full_path = gpkg_folder + "\\" + gpkg_file_name
 
-    arcpy.CreateFileGDB_management(gdb_folder, gdb_file_name)
+    #arcpy.CreateFilegpkg_management(gpkg_folder, gpkg_file_name)
 
-    return gdb_full_path, gdb_file_name
+    return gpkg_full_path, gpkg_file_name
 
 
 def export_joined(output_geodatabase_path, output_table_name, table_to_join,
@@ -644,36 +667,38 @@ def export_joined(output_geodatabase_path, output_table_name, table_to_join,
     Joins the temporary output to the join_fc_lyr feature class and writes it to geodatabase
     """
 
-    arcpy.env.qualifiedFieldNames = False  # to maintain proper field names
+    #arcpy.env.qualifiedFieldNames = False  # to maintain proper field names
 
     print("Adding indices")
 
-    check_esri_item(join_table)
-    add_index(lyr=join_table, field_name="GOID")
-    add_index(lyr=table_to_join, field_name="GOID")
+    # check_esri_item(join_table)
+    # add_index(lyr=join_table, field_name="GOID")
+    # add_index(lyr=table_to_join, field_name="GOID")
 
-    csi_fc = output_geodatabase_path + "\\" + output_table_name
+    # csi_fc = output_geodatabase_path + "\\" + output_table_name
 
-    # Copy the join feature class to the output destination
-    print("Joining features")
-    try:
-        join_name = "join_fc_lyr" + str(output_table_name)
-        join_fc_lyr = arcpy.MakeFeatureLayer_management(join_table, join_name)
-        joined = arcpy.AddJoin_management(
-            join_fc_lyr, "GOID", table_to_join, "GOID", "KEEP_ALL")
+    # # Copy the join feature class to the output destination
+    # print("Joining features")
+    # try:
+    #     join_name = "join_fc_lyr" + str(output_table_name)
+    #     join_fc_lyr = arcpy.MakeFeatureLayer_management(join_table, join_name)
+    #     joined = arcpy.AddJoin_management(
+    #         join_fc_lyr, "GOID", table_to_join, "GOID", "KEEP_ALL")
 
-        print("Exporting features")
+    #     print("Exporting features")
 
-        arcpy.CopyFeatures_management(joined, csi_fc)
+    #     arcpy.CopyFeatures_management(joined, csi_fc)
 
-        delete_field(esri_table=csi_fc,
-                     list_of_field_names=["OBJECTID_1", "GOID_1"])
+    #     delete_field(esri_table=csi_fc,
+    #                  list_of_field_names=["OBJECTID_1", "GOID_1"])
 
-    except Exception as err:
-        print ("Error joining or exporting feature class. {}".format(str(err)))
-        sys.exit(0)
+    # except Exception as err:
+    #     print ("Error joining or exporting feature class. {}".format(str(err)))
+    #     sys.exit(0)
 
-    return csi_fc
+    # return csi_fc
+
+    raise Exception("ERRRRROOOOOOOOOORRRRR")
 
 
 def get_ffr_field_names(name):
@@ -681,7 +706,7 @@ def get_ffr_field_names(name):
     ffr_stat2 = str(name) + "_FF2"
     ffr_dis = str(name) + "_FFID"
 
-    new_fields = [(ffr_stat1, 'i4'), (ffr_stat2, 'i4'), (ffr_dis, 'u4')]
+    new_fields = [ffr_stat1, ffr_stat2, ffr_dis]
 
     return ffr_stat1, ffr_stat2, ffr_dis, new_fields
 
@@ -691,7 +716,7 @@ def get_csi_field_names(name):
     dom_name = str(name) + "_D"
     ff_thresh = str(name) + "_FF"
 
-    new_fields = [(csi_name, 'f8'), (dom_name, '|S3'), (ff_thresh, 'i4')]
+    new_fields = [csi_name, dom_name, ff_thresh]
 
     return csi_name, dom_name, ff_thresh, new_fields
 
@@ -745,16 +770,18 @@ def remove_csi_traces(fc, name):
     :return:
     """
 
-    rename_list = [name]
+    # rename_list = [name]
 
-    fieldList = arcpy.ListFields(
-        fc)  # get a list of fields for each feature class
-    for field in fieldList:  # loop through each field
-        for ren in rename_list:
+    # fieldList = arcpy.ListFields(
+    #     fc)  # get a list of fields for each feature class
+    # for field in fieldList:  # loop through each field
+    #     for ren in rename_list:
 
-            if field.name.startswith(ren):
-                fn = field.name.replace(ren, 'CSI')
-                arcpy.AlterField_management(fc, field.name, fn, fn)
+    #         if field.name.startswith(ren):
+    #             fn = field.name.replace(ren, 'CSI')
+    #             arcpy.AlterField_management(fc, field.name, fn, fn)
+
+    raise Exception("EEERRRRRRRRROOOOOOOORRRRRR")
 
 
 def save_as_cpickle(pickle_object, folder, name, file_extension):
@@ -763,7 +790,7 @@ def save_as_cpickle(pickle_object, folder, name, file_extension):
         cPickle.dump(pickle_object, fp)
 
 
-def update_dam_routing_index(dams, arr):
+def update_dam_routing_index(dams:gpd.GeoDataFrame, arr:gpd.GeoDataFrame)->gpd.GeoDataFrame:
     """
     Function to recalculate the Global Network OIDs to match with the
     reduced network data set
@@ -774,8 +801,10 @@ def update_dam_routing_index(dams, arr):
     return:
         Updates and returns the dam numpy array with new network ids
     """
-    for dam in dams:
+    for index, dam in dams.iterrows():
         oldGOID = dam[fd.GOID]
-        find = arr[(arr[fd.GOID]) == oldGOID]
-        new_goid = find[fd.NOID]
-        dam[fd.GOID] = new_goid
+        find = arr[arr[fd.GOID] == oldGOID]
+        new_goid = find[fd.NOID].values[0]
+        dams.at[index, fd.GOID] = new_goid
+    
+    return dams

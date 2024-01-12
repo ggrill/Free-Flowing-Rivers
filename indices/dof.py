@@ -1,13 +1,14 @@
 import math
 import sys
+import geopandas as gpd
 
 from config import config
 
 fd = config.var
 
 
-def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
-                  use_dam_level_df):
+def calculate_DOF(dams:gpd.GeoDataFrame, streams:gpd.GeoDataFrame, mode:int, dof_field:str, drf_upstream:int, drf_downstream:int,
+                  use_dam_level_df:str):
     """
     Calculates the degree of fragmentation (DOF) given a set of dams
 
@@ -40,11 +41,11 @@ def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
     stop = set([])
 
     # First process everything upstream of dam
-    for dam in dams:
+    for index, dam in dams.iterrows():
 
         dam_goid = dam[fd.GOID]
 
-        if use_dam_level_df is True:
+        if use_dam_level_df is True or (isinstance(use_dam_level_df, str) and use_dam_level_df.upper() == "YES"):
             drf_upstream = dam[fd.DFU]
             drf_downstream = dam[fd.DFD]
         else:
@@ -72,7 +73,7 @@ def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
         discharge_barrier_location = disch[dam_goid - 1]
 
         if discharge_barrier_location == 0:
-            streams[dam_goid - 1][dof_field] = 100
+            streams.at[dam_goid - 1, dof_field] = 100
             continue
 
         # discharge range factor, usually 10 (= one order of magnitude)
@@ -87,7 +88,7 @@ def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
             for n in nodes:
 
                 # Add one or several constraints on how to rout
-                if n <> -1 and n <> '':
+                if n != -1 and n != '':
 
                     # Check if node has waterfall. If the waterfall is on the
                     # reach where the dam is, stop routing upstream
@@ -102,17 +103,15 @@ def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
                                 discharge_barrier=discharge_barrier_location,
                                 upstream_mode=upstream_mode,
                                 dis_range_factor=drf_upstream)
-                            if streams[n - 1][
-                                dof_field] <= local_impact_score or \
-                                    streams[n - 1][dof_field] == 0:
-                                streams[n - 1][
-                                    dof_field] = local_impact_score
+                            
+                            if streams.loc[n - 1][dof_field] <= local_impact_score or streams.loc[n - 1][dof_field] == 0:
+                                streams.at[n - 1, dof_field] = local_impact_score
 
                             # if local_impact_score > 0:  # find upstream nodes
                             upstream_oid = nuoid[n - 1].split("_")
                             if len(upstream_oid) > 0:
                                 for up in upstream_oid:
-                                    if up <> '' and up > 0:
+                                    if up != '' and int(up) > 0:
                                         new_nodes.append(int(up))
 
             nodes = new_nodes
@@ -125,7 +124,7 @@ def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
             if len(nodes) == 0:
                 break
             for n in nodes:
-                if n <> -1 and n <> '':
+                if n != -1 and n != '':
                     # declare segment as fragmented if local discharge of
                     # reach is within upper and lower limits
                     discharge_local = disch[n - 1]
@@ -135,9 +134,8 @@ def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
                             discharge_barrier=discharge_barrier_location,
                             downstream_mode=downstream_mode,
                             dis_range_factor=drf_downstream)
-                        if streams[n - 1][dof_field] <= local_impact_score or \
-                                streams[n - 1][dof_field] == 0:
-                            streams[n - 1][dof_field] = local_impact_score
+                        if streams.loc[n - 1][dof_field] <= local_impact_score or streams.loc[n - 1][dof_field] == 0:
+                            streams.at[n - 1, dof_field] = local_impact_score
 
                         # if local_impact_score > 0:  # find downstream nodes
                         downstream_oid = ndoid[n - 1]
@@ -146,6 +144,8 @@ def calculate_DOF(dams, streams, mode, dof_field, drf_upstream, drf_downstream,
                             downstream_reaches.add(downstream_oid)
 
             nodes = new_nodes
+
+    return dams, streams
 
 
 def get_dof_down(discharge_local, discharge_barrier, downstream_mode,
@@ -172,7 +172,7 @@ def get_dof_down(discharge_local, discharge_barrier, downstream_mode,
         b = a * (100 / math.log10(dis_range_factor))
         x = 100 - b
     else:
-        print "discharge mode undefined"
+        print("discharge mode undefined")
         sys.exit()
 
     # I some cases x can get out of bounds
@@ -208,7 +208,7 @@ def get_dof_up(discharge_local, discharge_barrier, upstream_mode,
         b = a * (100 / math.log10(dis_range_factor))
         x = 100 - b
     else:
-        print "discharge mode undefined"
+        print("discharge mode undefined")
         sys.exit()
 
     # I some cases x can get out of bounds

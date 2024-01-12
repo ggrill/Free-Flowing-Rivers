@@ -5,8 +5,13 @@ import tools.helper as tools
 from stats.benchmarking import fd
 
 
-def backbone_stats(stream_array, scenario_name, min_length,
-                   sta_pickle_folder, writer):
+def backbone_stats(
+        stream_array:pd.DataFrame,
+        scenario_name,
+        min_length,
+        sta_pickle_folder,
+        writer
+    ):
     """
     Calculate backbone stats
 
@@ -44,7 +49,7 @@ def backbone_stats(stream_array, scenario_name, min_length,
     tools.export_excel(bb3, 'List_of_FFRs', writer)
 
 
-def backbone_stats_0(sce_name, stream_array):
+def backbone_stats_0(sce_name, stream_array:pd.DataFrame):
     """
     Calculating backbone statistics for Table 1.
     Only two categories: free-flowing or not (no "good" status)
@@ -55,7 +60,7 @@ def backbone_stats_0(sce_name, stream_array):
     """
 
     # Converting to panda data frame
-    df = pd.DataFrame(stream_array)
+    df = stream_array.copy()
     df = df.loc[df["INC"] == 1]
 
     df.loc[:, "SCE"] = sce_name
@@ -111,7 +116,7 @@ def backbone_stats_0(sce_name, stream_array):
     return tbl_1
 
 
-def backbone_stats_1(sce_name, stream_array):
+def backbone_stats_1(sce_name, stream_array:pd.DataFrame):
     """
     Calculating backbone statistics for Table 1.
     Three categories presented in paper: free-flowing, good status, impacted
@@ -122,7 +127,7 @@ def backbone_stats_1(sce_name, stream_array):
     """
 
     # Converting to panda data frame
-    df = pd.DataFrame(stream_array)
+    df = stream_array.copy()
     df = df.loc[df["INC"] == 1]
 
     df.loc[:, "SCE"] = sce_name
@@ -178,7 +183,7 @@ def backbone_stats_1(sce_name, stream_array):
     return tbl_1
 
 
-def backbone_stats_2(sce_name, stream_array):
+def backbone_stats_2(sce_name, stream_array:pd.DataFrame):
     """
     Calculating backbone statistics for Table 1.
     Three categories presented in paper: free-flowing, good status, impacted
@@ -189,7 +194,7 @@ def backbone_stats_2(sce_name, stream_array):
     """
 
     # Converting to panda data frame
-    df = pd.DataFrame(stream_array)
+    df = stream_array.copy()
     df = df[df["INC"] == 1]
 
     df.loc[:, "SCE"] = sce_name
@@ -207,12 +212,13 @@ def backbone_stats_2(sce_name, stream_array):
             fd.VOLUME_TCM: np.sum
             }
 
-    good_temp = df.groupby([fd.CON_ID,
-                            fd.BB_ID],
-                           as_index=False).agg(fun1)
+    good_temp:pd.DataFrame = df.groupby([fd.CON_ID, fd.BB_ID], as_index=False).agg(fun1)
 
-    good_temp.loc[:, sce_name + "_LCAT"] = \
-        good_temp[fd.LENGTH_KM].apply(get_length_cat)
+    if good_temp.empty:
+        good_temp.rename(columns={sce_name + "_LCAT": 'LCAT'}, inplace=True)
+        return good_temp
+
+    good_temp.loc[:, sce_name + "_LCAT"] = good_temp[fd.LENGTH_KM].apply(get_length_cat)
 
     # The result is a list of rivers by continent. We're adding a "count"
     # field (NUM) so we can now count the number of rivers
@@ -234,7 +240,7 @@ def backbone_stats_2(sce_name, stream_array):
     return good
 
 
-def backbone_stats_3(scenario_name, stream_array, min_length):
+def backbone_stats_3(scenario_name, stream_array:pd.DataFrame, min_length):
     """
     Calculating backbone statistics for Excel appendix, i.e. list
     of free-flowing rivers larger than 500 km.
@@ -249,7 +255,7 @@ def backbone_stats_3(scenario_name, stream_array, min_length):
     """
 
     # Converting to panda data frame
-    df = pd.DataFrame(stream_array)
+    df = stream_array.copy()
     df = df.loc[df["INC"] == 1]
 
     df.loc[:, "SCE"] = scenario_name

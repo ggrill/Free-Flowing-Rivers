@@ -1,10 +1,11 @@
-import cPickle
+import pickle as cPickle
 import multiprocessing
 import os
 import sys
 import time
 
-import arcpy
+import geopandas as gpd
+
 import numpy as np
 import pandas as pd
 
@@ -26,15 +27,15 @@ def run_dor(stamp, para, paths):
     :return:
     """
 
-    dams_fc = para["dams_fc"]
-    streams_fc = para["streams_fc"]
+    dams_fc:gpd.GeoDataFrame = para["dams_fc"]
+    streams_fc:gpd.GeoDataFrame = para["streams_fc"]
 
-    update_mode = para["update_mode"]
+    update_mode:str = para["update_mode"]
 
     barrier_inc_field = para["barrier_inc_field"]
     dor_field = para["dor_field"]
 
-    gdb_full_path = paths["gdb_full_path"]
+    gpkg_full_path = paths["gpkg_full_path"]
 
     output_folder = para["output_folder"]
     output_folder = os.path.join(output_folder, "Results_" + stamp)
@@ -45,15 +46,16 @@ def run_dor(stamp, para, paths):
 
     in_basins = list(get_unique(dams_fc, barrier_inc_field))
 
-    print dams_fc
-    print ("Loading {}".format(str(streams_fc)))
+    print(dams_fc.head(1))
+    print (f"Loading streams")
     streams = load_streams(streams_fc, dor_field)
     dams_temp = load_dams(dams_fc, barrier_inc_field)
 
-    pooled = True
+    num_cores = os.cpu_count()
+    pooled = num_cores > 1
 
     if pooled:
-        pool = multiprocessing.Pool(8)
+        pool = multiprocessing.Pool(num_cores)
 
         jobs = []
         i = 1
@@ -64,12 +66,12 @@ def run_dor(stamp, para, paths):
             # Much faster than querying the global dataset on disk is
             # to load the global dataset into memory first and then query it
             # using numpy methods
-            streams_sel = np.copy(streams[streams[fd.BAS_ID] == basin])
+            streams_sel = streams[streams[fd.BAS_ID] == basin]
 
             # Also faster than querying the feature dataset on disk,
             # it is better to to load it once and then
             # use numpy indexing to get the dams we want
-            dams_sel = np.copy(dams_temp[dams_temp[fd.BAS_ID] == basin])
+            dams_sel = dams_temp[dams_temp[fd.BAS_ID] == basin]
 
             jobs.append(pool.apply_async(run_basin, (streams_sel, dams_sel, basin,
                                                      stamp + str(i), scratch_ws, dor_field)))
@@ -91,12 +93,12 @@ def run_dor(stamp, para, paths):
             # Much faster than querying the global dataset on disk is
             # to load the global dataset into memory first and then query it
             # using numpy methods
-            streams_sel = np.copy(streams[streams[fd.BAS_ID] == basin])
+            streams_sel = streams[streams[fd.BAS_ID] == basin]
 
             # Also faster than querying the feature dataset on disk,
             # it is better to to load it once and then
             # use numpy indexing to get the dams we want
-            dams_sel = np.copy(dams_temp[dams_temp[fd.BAS_ID] == basin])
+            dams_sel = dams_temp[dams_temp[fd.BAS_ID] == basin]
 
             jobs.append(
                 run_basin(streams_sel, dams_sel, basin, stamp + str(i), scratch_ws, dor_field))
@@ -105,7 +107,7 @@ def run_dor(stamp, para, paths):
         out_basin = [job for job in jobs]
 
     # Merge the temporary outputs
-    print("Merging temporary outputs into output table %s ..." % gdb_full_path)
+    print(f"Merging temporary outputs into output table {gpkg_full_path} ...")
 
     i = 0
     tbl = {}
@@ -115,35 +117,28 @@ def run_dor(stamp, para, paths):
         with open(bas, 'rb') as fp:
             tbl[i] = cPickle.load(fp)
 
-    merged = np.concatenate(tbl.values(), 1)
-
-    df = pd.DataFrame(merged)
-
-    # Turn panda to numpy
-    # https://my.usgs.gov/confluence/display/cdi/pandas.DataFrame+to+ArcGIS+Table
-    x = np.array(np.rec.fromrecords(df.values))
-    names = df.dtypes.index.tolist()
-    x.dtype.names = tuple(names)
-
-    output_table_location = gdb_full_path + "\\" + "dor"
-
-    arcpy.da.NumPyArrayToTable(x, output_table_location)
-    tool.add_index(lyr=merged, field_name="GOID")
+    gdf:gpd.GeoDataFrame = pd.concat(tbl.values(), axis = 1)
+    gdf.to_file(gpkg_full_path, driver="GPKG", layer = "DOR")
 
     # Update automatically
-    if update_mode == "YES":
-        print("Updating dor values in database {} ".format(streams_fc))
+    if update_mode.lower() == "YES":
+        print(f"Updating dor values in database {streams_fc.head(1)}")
 
-        tool.copy_between(to_join_fc=streams_fc,
-                          to_join_field="GOID",
-                          IntoJoinField=dor_field,
-                          FromJoinFC=output_table_location,
-                          FromJoinField="GOID",
-                          FromValueField=dor_field,
-                          over_mode=True,
-                          over_value=0)
+        gdf = tool.copy_between(
+            to_join_fc=streams_fc,
+            to_join_field="GOID",
+            IntoJoinField=dor_field,
+            FromJoinFC=gdf,
+            FromJoinField="GOID",
+            FromValueField=dor_field,
+            over_mode=True,
+            over_value=0
+        )
+        gdf.to_file(gpkg_full_path, driver="GPKG", layer = "DOR_COPIED")
 
     tool.delete_path(scratch_ws)
+
+    return gdf[dor_field]
 
 
 def run_basin(streams, dams, basin, stamp, scratchws, dor_field):
@@ -162,39 +157,34 @@ def run_basin(streams, dams, basin, stamp, scratchws, dor_field):
     :param use_dam_level_df:
     :return:
     """
-    scratch_gdb = set_environment(scratchws, basin, stamp)
+    scratch_gpkg = set_environment(scratchws, basin, stamp)
 
-    tool.update_stream_routing_index(streams)
-    tool.update_dam_routing_index(dams, streams)
+    streams = tool.update_stream_routing_index(streams)
+    dams = tool.update_dam_routing_index(dams, streams)
 
-    print ("Calculating DOR for basin {}".format(str(basin)))
+    print (f"Calculating DOR for basin {basin}")
 
-    indices.dor.calculate_dor(dams, streams, dor_field)
+    dams, streams = indices.dor.calculate_dor(dams, streams, dor_field)
 
-    final_table = export(streams, basin, scratch_gdb)
+    final_table = export(streams, basin, scratch_gpkg)
 
     # Return only reference (path) to table
     return final_table
 
 
-def get_unique(dam_table, inc_field):
+def get_unique(dam_table:gpd.GeoDataFrame, inc_field)->gpd.GeoDataFrame:
     """
     Calculates a list of unique river basins that need to be processed based
     on the barriers to be considered.
 
-    :param dam_table: umpy array with dams to process
+    :param dam_table: numpy array with dams to process
     :param inc_field: field to determine dams to include
     :return: List of river basins
     """
+    
+    in_basins:gpd.GeoDataFrame = dam_table[dam_table[inc_field] == 1]
+    in_basins = in_basins[fd.BAS_ID].unique()
 
-    flds = [fd.BAS_ID, inc_field]
-    whereBClause = inc_field + ' = 1'
-    whereBClause = whereBClause.replace("'", "")
-
-    dams = arcpy.da.TableToNumPyArray(
-        dam_table, flds, whereBClause, null_value=-1)
-
-    in_basins = np.unique(dams[fd.BAS_ID])
 
     if 0 in in_basins:
         sys.exit(
@@ -222,7 +212,7 @@ def set_environment(scratch_ws, basin, stamp):
     return fullpath
 
 
-def load_dams(dam_table, inc_field):
+def load_dams(dam_table:gpd.GeoDataFrame, inc_field):
     """
     This function loads from the database
 
@@ -235,14 +225,9 @@ def load_dams(dam_table, inc_field):
 
     tool.check_fields(dam_table, flds + [fd.INC])
 
-    whereBClause2 = inc_field + ' > 0'
-    whereBClause3 = ' AND ' + fd.INC + ' > 0'
-    whereBClause4 = whereBClause2 + whereBClause3
-    whereBClause5 = whereBClause4.replace("'", "")
-
-    dams = arcpy.da.TableToNumPyArray(dam_table, flds, whereBClause5, null_value=0)
-
-    return dams
+    dam_table[flds].fillna(0)
+    dam_table = dam_table[(dam_table[inc_field] > 0) & (dam_table[fd.INC] > 0)]
+    return dam_table
 
 
 def load_streams(stream_table, dor_field):
@@ -259,10 +244,10 @@ def load_streams(stream_table, dor_field):
 
     tool.check_fields(stream_table, flds)
 
-    arr = arcpy.da.TableToNumPyArray(stream_table, flds, null_value=0)
-    arr = tool.add_fields(arr, [(str(dor_field), 'f4')])
-    arr[dor_field] = 0
-    return arr
+    stream_table[flds].fillna(0)
+    stream_table = tool.add_fields(stream_table, [str(dor_field), 'f4'])
+    
+    return stream_table
 
 
 def export(streams, basin, folder):
@@ -279,22 +264,23 @@ def export(streams, basin, folder):
     return fullpath
 
 
-def create_gdb_workspace(gdb_folder, gdb_name):
+def create_gpkg_workspace(gpkg_folder, gpkg_name):
     """
     Creates a path and a geodatabase with timestamp
 
     :param stamp:
-    :param gdb_folder:
-    :param gdb_name:
+    :param gpkg_folder:
+    :param gpkg_name:
     :return:
     """
+    raise Exception("ERRRROOOOOOR")
 
-    if not os.path.exists(gdb_folder):
-        os.makedirs(gdb_folder)
+    if not os.path.exists(gpkg_folder):
+        os.makedirs(gpkg_folder)
 
-    gdb_file_name = gdb_name + ".gdb"
-    gdb_full_path = gdb_folder + "\\" + gdb_file_name
+    gpkg_file_name = gpkg_name + ".gpkg"
+    gpkg_full_path = gpkg_folder + "\\" + gpkg_file_name
 
-    arcpy.CreateFileGDB_management(gdb_folder, gdb_file_name)
+    arcpy.CreateFilegpkg_management(gpkg_folder, gpkg_file_name)
 
-    return gdb_full_path, gdb_file_name
+    return gpkg_full_path, gpkg_file_name

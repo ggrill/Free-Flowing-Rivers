@@ -12,7 +12,7 @@ from config import config as conf
 fd = conf.var
 
 
-def calculate_sta(stream_array, stream_alt, ff_field, ffr_stat1_field, ffr_stat2_field,
+def calculate_sta(stream_array:pd.DataFrame, stream_alt:pd.DataFrame, ff_field, ffr_stat1_field, ffr_stat2_field,
                   ffr_dis_id_field):
     """
     Calculate the free-flowing status (STA)
@@ -28,10 +28,10 @@ def calculate_sta(stream_array, stream_alt, ff_field, ffr_stat1_field, ffr_stat2
     status_dict = {}
 
     # creating a DataFrame using the alternative (filtered) stream network
-    df = pd.DataFrame(stream_alt)
+    df = stream_alt.copy()
 
     fun = {fd.LENGTH_KM: np.sum, fd.BB_LEN_KM: 'first'}
-    df2 = df.groupby([fd.BB_ID, ffr_dis_id_field, ff_field],
+    df2:pd.DataFrame = df.groupby([fd.BB_ID, ffr_dis_id_field, ff_field],
                      as_index=False).agg(fun)
 
     # TODO: If study area cuts part of river network, the status attribute
@@ -48,16 +48,15 @@ def calculate_sta(stream_array, stream_alt, ff_field, ffr_stat1_field, ffr_stat2
     pct_ff = df2["PCT_FF"].tolist()
     status = df2[ff_field].tolist()
 
-    x = 0
-    for r in dis_id:
+    for x, r in enumerate(dis_id):
         dis_id_val = dis_id[x]
         pct_ff_val = pct_ff[x]
         status_val = status[x]
 
-        status_dict[dis_id_val] = return_sta(status_val=status_val,
-                                             pct_ff_val=pct_ff_val)
-
-        x += 1
+        status_dict[dis_id_val] = return_sta(
+            status_val=status_val,
+            pct_ff_val=pct_ff_val
+        )
 
     print("Updating status in original stream_array")
     stream_array = calc_status_values(stream_array, status_dict, ffr_dis_id_field, ffr_stat1_field, ffr_stat2_field)
@@ -65,7 +64,7 @@ def calculate_sta(stream_array, stream_alt, ff_field, ffr_stat1_field, ffr_stat2
     return stream_array
 
 
-def calc_status_values(stream_array, status_dict, ffr_dis_id_field, ffr_stat1_field, ffr_stat2_field):
+def calc_status_values(stream_array:pd.DataFrame, status_dict:dict, ffr_dis_id_field, ffr_stat1_field, ffr_stat2_field):
     """
     Assigns Free-flowing river status (STA) to the river reach.
     There are two types of STA values:
@@ -90,30 +89,30 @@ def calc_status_values(stream_array, status_dict, ffr_dis_id_field, ffr_stat1_fi
     :return:
     """
 
-    for stream in stream_array:
+    for index, stream in stream_array.iterrows():
         dis_id = stream[ffr_dis_id_field]
         status = status_dict.get(dis_id, 0)
 
         if status == 3:
-            stream[ffr_stat1_field] = 3
-            stream[ffr_stat2_field] = 3
+            stream_array.at[index, ffr_stat1_field] = 3
+            stream_array.at[index, ffr_stat2_field] = 3
         elif status == 2:
-            stream[ffr_stat1_field] = 3
-            stream[ffr_stat2_field] = 2
+            stream_array.at[index, ffr_stat1_field] = 3
+            stream_array.at[index, ffr_stat2_field] = 2
         elif status == 1:
-            stream[ffr_stat1_field] = 1
-            stream[ffr_stat2_field] = 1
+            stream_array.at[index, ffr_stat1_field] = 1
+            stream_array.at[index, ffr_stat2_field] = 1
         else:
             # Should not occur
             print("{} with invalid STA value".format(str(stream[fd.GOID])))
 
-            stream[ffr_stat1_field] = 0
-            stream[ffr_stat2_field] = 0
+            stream_array.at[index, ffr_stat1_field] = 0
+            stream_array.at[index, ffr_stat2_field] = 0
 
     return stream_array
 
 
-def return_sta(status_val, pct_ff_val):
+def return_sta(status_val, pct_ff_val): 
     """
     Calculates the STA value
 
@@ -135,7 +134,7 @@ def return_sta(status_val, pct_ff_val):
         return 3
 
 
-def dissolve_rivers(stream_array_temp, ff_fields, dis_id_field):
+def dissolve_rivers(stream_array_temp:pd.DataFrame, ff_fields, dis_id_field):
     """
     This function is dissolving the results feature class and return
     aggregated results for each backbone river.
@@ -226,7 +225,7 @@ def dissolve_rivers(stream_array_temp, ff_fields, dis_id_field):
     return stream_array_temp
 
 
-def apply_volume_filter(csi_fc, ff_field, dis_id_field, pct_aff_thres):
+def apply_volume_filter(csi_fc:pd.DataFrame, ff_field, dis_id_field, pct_aff_thres):
 
     """
     This filter averages out some small inconsistencies, that could affect big rivers
@@ -238,7 +237,7 @@ def apply_volume_filter(csi_fc, ff_field, dis_id_field, pct_aff_thres):
     :return:
     """
 
-    df = pd.DataFrame(csi_fc)
+    df = csi_fc.copy()
     df = df[df[ff_field] == 0]
 
     fun = {fd.LENGTH_KM: np.sum, fd.VOLUME_TCM: np.sum, fd.BB_VOL_TCM: 'first'}
@@ -255,7 +254,7 @@ def apply_volume_filter(csi_fc, ff_field, dis_id_field, pct_aff_thres):
     return df1
 
 
-def update_csi(streams_diss, bb_id_to_filter, dis_id_field, csi_field, ff_field):
+def update_csi(streams_diss:pd.DataFrame, bb_id_to_filter:pd.DataFrame, dis_id_field, csi_field, ff_field):
     """
     This function alters the reach level results according to the spatial
     filtering after dissolving that occurred before.
@@ -276,20 +275,20 @@ def update_csi(streams_diss, bb_id_to_filter, dis_id_field, csi_field, ff_field)
     cnt = 0
 
     bbid_list = []
-    for index, stretch in bb_id_to_filter.iterrows():
+    for _, stretch in bb_id_to_filter.iterrows():
         bbid = int(stretch[fd.BB_ID])
         dis_id = int(stretch[dis_id_field])
         bbid_list.append(str(bbid) + str(dis_id))
 
-    for stream in streams_diss:
+    for index, stream in streams_diss.iterrows():
         bb_id = int(stream[fd.BB_ID])
         dis_id = int(stream[dis_id_field])
 
         combo = str(bb_id) + str(dis_id)
 
         if combo in bbid_list:
-            stream[csi_field] = 100
-            stream[ff_field] = 1
+            streams_diss.at[index, csi_field] = 100
+            streams_diss.at[index, ff_field] = 1
             cnt += 1
 
     # Number of river reaches temporarliy altered for this procedur
@@ -298,7 +297,7 @@ def update_csi(streams_diss, bb_id_to_filter, dis_id_field, csi_field, ff_field)
     return streams_diss
 
 
-def update_streams_with_diss_id(stream_array, streams_diss2, ff_dis_id_field):
+def update_streams_with_diss_id(stream_array:pd.DataFrame, streams_diss2:pd.DataFrame, ff_dis_id_field):
     """
     Function to update original stream ID
 
@@ -310,8 +309,9 @@ def update_streams_with_diss_id(stream_array, streams_diss2, ff_dis_id_field):
     dis_ids = streams_diss2[ff_dis_id_field].tolist()
 
     indx = 0
-    for stream in stream_array:
+    for index, stream in stream_array.iterrows():
         disid = dis_ids[indx]
-        stream[ff_dis_id_field] = disid
+        stream_array.at[index, ff_dis_id_field] = disid
         indx += 1
+
     return stream_array
